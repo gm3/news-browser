@@ -5,12 +5,29 @@ let originalJsonData = null;
 let currentCuratedJson = null;
 
 function formatDate(unixTimestamp) {
+    // Create date object in UTC to avoid timezone issues
     const date = new Date(unixTimestamp * 1000);
-    return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
+    
+    // Force UTC interpretation for display
+    return new Date(date.getTime() + date.getTimezoneOffset() * 60000)
+        .toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+}
+
+// Helper function to extract date from title if needed
+function extractDateFromTitle(title) {
+    const dateMatch = title.match(/(\d{4}-\d{2}-\d{2})/);
+    if (dateMatch && dateMatch[1]) {
+        // Create date using UTC to avoid timezone issues
+        const [year, month, day] = dateMatch[1].split('-').map(num => parseInt(num, 10));
+        // Use UTC date constructor to avoid timezone issues
+        const dateObj = new Date(Date.UTC(year, month - 1, day));
+        return Math.floor(dateObj.getTime() / 1000);
+    }
+    return null;
 }
 
 function showJsonViewer(jsonData) {
@@ -81,10 +98,12 @@ function generateCuratedJson() {
         return;
     }
 
-    // Create new JSON structure maintaining original categories
+    // Create new JSON structure maintaining original format
     const curatedJson = {
-        date: originalJsonData.date,
-        categories: []
+        type: originalJsonData.type || "dailySummary",
+        title: originalJsonData.title || `Daily Summary for ${new Date().toISOString().split('T')[0]}`,
+        categories: [],
+        date: originalJsonData.date
     };
 
     // Group curated items by their original categories
@@ -98,9 +117,11 @@ function generateCuratedJson() {
 
     // Create categories array with curated content
     Object.keys(itemsByCategory).forEach(categoryTitle => {
+        const originalCategory = originalJsonData.categories.find(cat => cat.title === categoryTitle);
         curatedJson.categories.push({
             title: categoryTitle,
-            content: itemsByCategory[categoryTitle]
+            content: itemsByCategory[categoryTitle],
+            topic: originalCategory?.topic || ""
         });
     });
 
@@ -158,60 +179,90 @@ function loadNews(url = DEFAULT_URL) {
             const feedContainer = document.getElementById("feed-container");
             feedContainer.innerHTML = "";
             
+            // Display date - try to get from date field or extract from title
+            let displayDate = "";
             if (jsonData.date) {
+                displayDate = formatDate(jsonData.date);
+            } else if (jsonData.title) {
+                const extractedDate = extractDateFromTitle(jsonData.title);
+                if (extractedDate) {
+                    displayDate = formatDate(extractedDate);
+                } else {
+                    displayDate = jsonData.title;
+                }
+            }
+            
+            if (displayDate) {
                 const dateHeader = document.createElement("h3");
                 dateHeader.className = "date-header";
-                dateHeader.textContent = formatDate(jsonData.date);
+                dateHeader.textContent = displayDate;
                 feedContainer.appendChild(dateHeader);
             }
 
             // Group content by categories
-            jsonData.categories.forEach((category) => {
-                const categorySection = document.createElement("div");
-                categorySection.classList.add("category-section");
-                
-                const categoryTitle = document.createElement("h2");
-                categoryTitle.classList.add("category-title");
-                categoryTitle.textContent = category.title;
-                categorySection.appendChild(categoryTitle);
-
-                category.content.forEach((item) => {
-                    item.category = category.title;
+            if (jsonData.categories && Array.isArray(jsonData.categories)) {
+                jsonData.categories.forEach((category) => {
+                    const categorySection = document.createElement("div");
+                    categorySection.classList.add("category-section");
                     
-                    let card = document.createElement("div");
-                    card.classList.add("card");
-                    card.draggable = true;
-                    
-                    const sourceLinks = item.sources.map(source => 
-                        `<a href="${source}" target="_blank">${source}</a>`
-                    ).join('<br>');
+                    const categoryTitle = document.createElement("h2");
+                    categoryTitle.classList.add("category-title");
+                    categoryTitle.textContent = category.title;
+                    categorySection.appendChild(categoryTitle);
 
-                    card.innerHTML = `
-                        <div class="card-image">
-                            <img src="${item.images.length ? item.images[0] : 'images/nothumb.png'}" alt="News thumbnail" />
-                        </div>
-                        <div class="card-content">
-                            <p>${item.text}</p>
-                            <div class="source-links">
-                                ${sourceLinks}
-                            </div>
-                        </div>
-                    `;
+                    // Make sure content is an array before iterating
+                    if (category.content && Array.isArray(category.content)) {
+                        category.content.forEach((item) => {
+                            // Store category with the item for later reference
+                            item.category = category.title;
+                            
+                            let card = document.createElement("div");
+                            card.classList.add("card");
+                            card.draggable = true;
+                            
+                            // Handle source links, if available
+                            let sourceLinks = '';
+                            if (item.sources && Array.isArray(item.sources)) {
+                                sourceLinks = item.sources.map(source => 
+                                    `<a href="${source}" target="_blank">${source}</a>`
+                                ).join('<br>');
+                            }
 
-                    card.addEventListener("dragstart", (e) => {
-                        e.dataTransfer.setData("text/plain", JSON.stringify(item));
-                        card.classList.add("dragging");
-                    });
+                            // Default image if no images available
+                            const imageUrl = (item.images && item.images.length) ? 
+                                item.images[0] : 'images/nothumb.png';
 
-                    card.addEventListener("dragend", () => {
-                        card.classList.remove("dragging");
-                    });
+                            card.innerHTML = `
+                                <div class="card-image">
+                                    <img src="${imageUrl}" alt="News thumbnail" />
+                                </div>
+                                <div class="card-content">
+                                    <p>${item.text || "No content available"}</p>
+                                    <div class="source-links">
+                                        ${sourceLinks}
+                                    </div>
+                                </div>
+                            `;
 
-                    categorySection.appendChild(card);
+                            card.addEventListener("dragstart", (e) => {
+                                e.dataTransfer.setData("text/plain", JSON.stringify(item));
+                                card.classList.add("dragging");
+                            });
+
+                            card.addEventListener("dragend", () => {
+                                card.classList.remove("dragging");
+                            });
+
+                            categorySection.appendChild(card);
+                        });
+                    }
+
+                    feedContainer.appendChild(categorySection);
                 });
-
-                feedContainer.appendChild(categorySection);
-            });
+            } else {
+                // No categories found or not an array
+                feedContainer.innerHTML = "<p>No valid categories found in the data.</p>";
+            }
         })
         .catch(error => {
             console.error("Error fetching news:", error);
@@ -265,9 +316,19 @@ function updateCuratedItemsDisplay() {
     curatedItems.forEach((item, index) => {
         const itemElement = document.createElement('div');
         itemElement.className = 'curated-item';
+        
+        // Default image if no images available
+        const imageUrl = (item.images && item.images.length) ? 
+            item.images[0] : 'images/nothumb.png';
+            
+        // Truncate text for display
+        const displayText = item.text ? 
+            (item.text.length > 50 ? item.text.substring(0, 50) + "..." : item.text) : 
+            "No content";
+            
         itemElement.innerHTML = `
-            <img src="${item.images.length ? item.images[0] : 'images/nothumb.png'}" alt="Thumbnail" />
-            <p>${item.text.substring(0, 50)}...</p>
+            <img src="${imageUrl}" alt="Thumbnail" />
+            <p>${displayText}</p>
             <button onclick="removeItem(${index})" class="remove-btn">×</button>
         `;
         container.appendChild(itemElement);
