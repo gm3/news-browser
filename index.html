@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>News Browser</title>
+    <title>AI News Browser</title>
     <style>
         html, body {
             height: 100%;
@@ -15,25 +15,56 @@
 <body>
     <div class="container">
         <header>
-           
+            <div class="app-title">
+                <h1>AI News Browser</h1>
+            </div>
             <div class="header-controls">
+                <div class="search-container">
+                    <input type="text" id="search-input" placeholder="Search news...">
+                    <button id="search-btn">Search</button>
+                </div>
                 <button id="load-news-btn">Load News</button>
                 <button id="view-original-json-btn">View Original JSON</button>
                 <button id="generate-json-btn">Generate Curated JSON</button>
             </div>
+            <div id="category-filter" class="category-filter"></div>
         </header>
         <main>
+            <div id="loading-indicator" class="loading-indicator">
+                <div class="spinner"></div>
+                <p>Loading news...</p>
+            </div>
             <div id="feed-container" class="feed"></div>
         </main>
         <footer>
             <div class="footer-content">
-                <div id="drop-zone" class="drop-zone">Drop</div>
+                <div class="curation-info">
+                    <h3>Drag items here to curate</h3>
+                    <div id="drop-zone" class="drop-zone">Drop</div>
+                </div>
                 <div id="active-feed" class="active-feed">
-                  
+                    <h3>Curated Items (<span id="curated-count">0</span>)</h3>
+                    <div class="curated-controls">
+                        <button id="clear-curated-btn" title="Clear all curated items">Clear All</button>
+                        <button id="save-curated-btn" title="Save curated items to local storage">Save</button>
+                    </div>
                     <div class="curated-items"></div>
                 </div>
             </div>
         </footer>
+        <div id="keyboard-shortcuts" class="keyboard-shortcuts">
+            <button id="toggle-shortcuts">?</button>
+            <div class="shortcuts-panel">
+                <h3>Keyboard Shortcuts</h3>
+                <ul>
+                    <li><kbd>L</kbd> - Load News</li>
+                    <li><kbd>S</kbd> - Search</li>
+                    <li><kbd>V</kbd> - View JSON</li>
+                    <li><kbd>G</kbd> - Generate Curated JSON</li>
+                    <li><kbd>?</kbd> - Toggle Shortcuts</li>
+                </ul>
+            </div>
+        </div>
     </div>
     <script src="script.js"></script>
 </body>
