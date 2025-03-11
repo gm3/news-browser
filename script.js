@@ -1,5 +1,5 @@
 // Keep existing constants and helper functions
-const DEFAULT_URL = "https://raw.githubusercontent.com/bozp-pzob/ai-news/refs/heads/main/json/daily.json";
+const DEFAULT_URL = "https://m3-org.github.io/ai-news/daily.json";
 let curatedItems = [];
 let originalJsonData = null;
 let currentCuratedJson = null;
