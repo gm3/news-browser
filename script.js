@@ -1,5 +1,5 @@
 // Constants and state
-const DEFAULT_URL = "https://m3-org.github.io/ai-news/daily.json";
+const DEFAULT_URL = "https://m3-org.github.io/ai-news/json/daily.json";
 const STORAGE_KEY = "ai_news_curated_items";
 let curatedItems = [];
 let originalJsonData = null;
