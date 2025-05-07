@@ -6,7 +6,7 @@ import { initializeKeyboardShortcuts } from './keyboardShortcuts.js';
 
 // Constants
 export const CONFIG = {
-    DEFAULT_URL: "https://m3-org.github.io/ai-news/daily.json",
+    DEFAULT_URL: "https://elizaos.github.io/knowledge/ai-news/elizaos/json/daily.json",
     STORAGE_KEY: "ai_news_curated_items"
 };
 
