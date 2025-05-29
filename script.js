@@ -23,23 +23,34 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Initialize all event listeners
 function initializeEventListeners() {
+    // Helper function to safely add event listeners
+    const safeAddEventListener = (id, event, handler) => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener(event, handler);
+        }
+    };
+
     // Basic controls
-    document.getElementById('load-news-btn').addEventListener('click', showUrlPrompt);
-    document.getElementById('view-original-json-btn').addEventListener('click', viewOriginalJson);
-    document.getElementById('generate-json-btn').addEventListener('click', generateCuratedJson);
+    safeAddEventListener('load-news-btn', 'click', showUrlPrompt);
+    safeAddEventListener('view-original-json-btn', 'click', viewOriginalJson);
+    safeAddEventListener('generate-json-btn', 'click', generateCuratedJson);
     
     // Search
-    document.getElementById('search-btn').addEventListener('click', performSearch);
-    document.getElementById('search-input').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') performSearch();
-    });
+    safeAddEventListener('search-btn', 'click', performSearch);
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) {
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') performSearch();
+        });
+    }
     
     // Curation controls
-    document.getElementById('clear-curated-btn').addEventListener('click', clearCuratedItems);
-    document.getElementById('save-curated-btn').addEventListener('click', saveItems);
+    safeAddEventListener('clear-curated-btn', 'click', clearCuratedItems);
+    safeAddEventListener('save-curated-btn', 'click', saveItems);
     
     // Keyboard shortcuts toggle
-    document.getElementById('toggle-shortcuts').addEventListener('click', toggleShortcutsPanel);
+    safeAddEventListener('toggle-shortcuts', 'click', toggleShortcutsPanel);
 }
 
 // Initialize keyboard shortcuts
@@ -334,12 +345,16 @@ function generateCuratedJson() {
 
 // Main function to load news from URL
 function loadNews(url = DEFAULT_URL) {
-    // Show loading indicator
     const loadingIndicator = document.getElementById('loading-indicator');
-    loadingIndicator.style.display = 'flex';
-    
-    // Disable load button while loading
-    document.getElementById('load-news-btn').disabled = true;
+    const loadNewsBtn = document.getElementById('load-news-btn');
+    const feedContainer = document.getElementById("feed-container");
+
+    if (loadingIndicator) {
+        loadingIndicator.style.display = 'flex';
+    }
+    if (loadNewsBtn) {
+        loadNewsBtn.disabled = true;
+    }
     
     fetch(url)
         .then(response => {
@@ -350,145 +365,137 @@ function loadNews(url = DEFAULT_URL) {
         })
         .then(jsonData => {
             originalJsonData = jsonData;
-            const feedContainer = document.getElementById("feed-container");
-            feedContainer.innerHTML = "";
             
-            // Display date - try to get from date field or extract from title
-            let displayDate = "";
-            let lastUpdated = "";
+            if (feedContainer) {
+                feedContainer.innerHTML = "";
             
-            if (jsonData.date) {
-                displayDate = formatDate(jsonData.date);
-                lastUpdated = new Date().toLocaleString();
-            } else if (jsonData.title) {
-                const extractedDate = extractDateFromTitle(jsonData.title);
-                if (extractedDate) {
-                    displayDate = formatDate(extractedDate);
-                } else {
-                    displayDate = jsonData.title;
-                }
-                lastUpdated = new Date().toLocaleString();
-            }
+                let displayDate = "";
+                let lastUpdated = "";
             
-            if (displayDate) {
-                const dateHeader = document.createElement("h3");
-                dateHeader.className = "date-header";
-                dateHeader.innerHTML = `
-                    <span>${displayDate}</span>
-                    <span class="date-refresh">Last refreshed: ${lastUpdated}</span>
-                `;
-                feedContainer.appendChild(dateHeader);
-            }
-
-            // Set up category filters
-            setupCategoryFilters(jsonData);
-
-            // Group content by categories
-            if (jsonData.categories && Array.isArray(jsonData.categories)) {
-                jsonData.categories.forEach((category) => {
-                    const categorySection = document.createElement("div");
-                    categorySection.classList.add("category-section");
-                    categorySection.dataset.category = category.title;
-                    
-                    const categoryTitle = document.createElement("h2");
-                    categoryTitle.classList.add("category-title");
-                    
-                    // Count the number of items in the category
-                    const itemCount = category.content ? category.content.length : 0;
-                    
-                    categoryTitle.innerHTML = `
-                        <span>${category.title}</span>
-                        <span class="item-count">${itemCount} item${itemCount !== 1 ? 's' : ''}</span>
-                    `;
-                    categorySection.appendChild(categoryTitle);
-
-                    // Make sure content is an array before iterating
-                    if (category.content && Array.isArray(category.content)) {
-                        category.content.forEach((item) => {
-                            // Store category with the item for later reference
-                            item.category = category.title;
-                            
-                            let card = document.createElement("div");
-                            card.classList.add("card");
-                            card.draggable = true;
-                            card.dataset.text = item.text.toLowerCase();
-                            
-                            // Handle source links, if available
-                            let sourceLinks = '';
-                            if (item.sources && Array.isArray(item.sources)) {
-                                if (item.sources.length === 1) {
-                                    // Single source - just show the link
-                                    sourceLinks = `<a href="${item.sources[0]}" target="_blank" class="source-link">${item.sources[0]}</a>`;
-                                } else if (item.sources.length > 1) {
-                                    // Multiple sources - create toggle list
-                                    const toggleId = `sources-${Date.now()}-${Math.floor(Math.random()*1000)}`;
-                                    sourceLinks = `
-                                        <div class="source-toggle">
-                                            <button class="source-toggle-btn" onclick="toggleSourceList('${toggleId}')">
-                                                ${item.sources.length} Sources
-                                                <span class="toggle-icon">+</span>
-                                            </button>
-                                            <div id="${toggleId}" class="source-list">
-                                                ${item.sources.map(source => 
-                                                    `<a href="${source}" target="_blank">${source}</a>`
-                                                ).join('')}
-                                            </div>
-                                        </div>
-                                    `;
-                                }
-                            }
-
-                            // Default image if no images available
-                            const imageUrl = (item.images && item.images.length) ? 
-                                item.images[0] : 'images/nothumb.png';
-
-                            card.innerHTML = `
-                                <div class="card-image">
-                                    <img src="${imageUrl}" alt="News thumbnail" onerror="this.src='images/nothumb.png';" />
-                                </div>
-                                <div class="card-content">
-                                    <p>${item.text || "No content available"}</p>
-                                    <div class="source-links">
-                                        ${sourceLinks}
-                                    </div>
-                                </div>
-                            `;
-
-                            card.addEventListener("dragstart", (e) => {
-                                e.dataTransfer.setData("text/plain", JSON.stringify(item));
-                                card.classList.add("dragging");
-                            });
-
-                            card.addEventListener("dragend", () => {
-                                card.classList.remove("dragging");
-                            });
-
-                            categorySection.appendChild(card);
-                        });
+                if (jsonData.date) {
+                    displayDate = formatDate(jsonData.date);
+                    lastUpdated = new Date().toLocaleString();
+                } else if (jsonData.title) {
+                    const extractedDate = extractDateFromTitle(jsonData.title);
+                    if (extractedDate) {
+                        displayDate = formatDate(extractedDate);
+                    } else {
+                        displayDate = jsonData.title;
                     }
+                    lastUpdated = new Date().toLocaleString();
+                }
+            
+                if (displayDate) {
+                    const dateHeader = document.createElement("h3");
+                    dateHeader.className = "date-header";
+                    dateHeader.innerHTML = `
+                        <span>${displayDate}</span>
+                        <span class="date-refresh">Last refreshed: ${lastUpdated}</span>
+                    `;
+                    feedContainer.appendChild(dateHeader);
+                }
 
-                    feedContainer.appendChild(categorySection);
-                });
-                
-                // Apply any active filters or search
-                applyFiltersAndSearch();
-            } else {
-                // No categories found or not an array
-                feedContainer.innerHTML = "<p style='text-align: center; margin-top: 50px;'>No valid categories found in the data.</p>";
+                setupCategoryFilters(jsonData);
+
+                if (jsonData.categories && Array.isArray(jsonData.categories)) {
+                    jsonData.categories.forEach((category) => {
+                        const categorySection = document.createElement("div");
+                        categorySection.classList.add("category-section");
+                        categorySection.dataset.category = category.title;
+                        
+                        const categoryTitle = document.createElement("h2");
+                        categoryTitle.classList.add("category-title");
+                        
+                        const itemCount = category.content ? category.content.length : 0;
+                        
+                        categoryTitle.innerHTML = `
+                            <span>${category.title}</span>
+                            <span class="item-count">${itemCount} item${itemCount !== 1 ? 's' : ''}</span>
+                        `;
+                        categorySection.appendChild(categoryTitle);
+
+                        if (category.content && Array.isArray(category.content)) {
+                            category.content.forEach((item) => {
+                                item.category = category.title;
+                                let card = document.createElement("div");
+                                card.classList.add("card");
+                                card.draggable = true;
+                                card.dataset.text = item.text.toLowerCase();
+                                
+                                let sourceLinks = '';
+                                if (item.sources && Array.isArray(item.sources)) {
+                                    if (item.sources.length === 1) {
+                                        sourceLinks = `<a href="${item.sources[0]}" target="_blank" class="source-link">${item.sources[0]}</a>`;
+                                    } else if (item.sources.length > 1) {
+                                        const toggleId = `sources-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+                                        sourceLinks = `
+                                            <div class="source-toggle">
+                                                <button class="source-toggle-btn" onclick="toggleSourceList('${toggleId}')">
+                                                    ${item.sources.length} Sources
+                                                    <span class="toggle-icon">+</span>
+                                                </button>
+                                                <div id="${toggleId}" class="source-list">
+                                                    ${item.sources.map(source => 
+                                                        `<a href="${source}" target="_blank">${source}</a>`
+                                                    ).join('')}
+                                                </div>
+                                            </div>
+                                        `;
+                                    }
+                                }
+
+                                const imageUrl = (item.images && item.images.length) ? 
+                                    item.images[0] : 'images/nothumb.png';
+
+                                card.innerHTML = `
+                                    <div class="card-image">
+                                        <img src="${imageUrl}" alt="News thumbnail" onerror="this.src='images/nothumb.png';" />
+                                    </div>
+                                    <div class="card-content">
+                                        <p>${item.text || "No content available"}</p>
+                                        <div class="source-links">
+                                            ${sourceLinks}
+                                        </div>
+                                    </div>
+                                `;
+
+                                card.addEventListener("dragstart", (e) => {
+                                    e.dataTransfer.setData("text/plain", JSON.stringify(item));
+                                    card.classList.add("dragging");
+                                });
+
+                                card.addEventListener("dragend", () => {
+                                    card.classList.remove("dragging");
+                                });
+
+                                categorySection.appendChild(card);
+                            });
+                        }
+                        feedContainer.appendChild(categorySection);
+                    });
+                    applyFiltersAndSearch();
+                } else {
+                    feedContainer.innerHTML = "<p style='text-align: center; margin-top: 50px;'>No valid categories found in the data.</p>";
+                }
             }
         })
         .catch(error => {
-            console.error("Error fetching news:", error);
-            document.getElementById('feed-container').innerHTML = 
-                `<p style='text-align: center; margin-top: 50px; color: #dc3545;'>
-                    Error loading news: ${error.message}<br><br>
-                    <button onclick="loadNews()">Try Again</button>
-                </p>`;
+            console.error("Error fetching news (from script.js loadNews):", error);
+            if (feedContainer) {
+                feedContainer.innerHTML = 
+                    `<p style='text-align: center; margin-top: 50px; color: #dc3545;'>
+                        Error loading news: ${error.message}<br><br>
+                        <button onclick="loadNews()">Try Again</button>
+                    </p>`;
+            }
         })
         .finally(() => {
-            // Hide loading indicator
-            loadingIndicator.style.display = 'none';
-            document.getElementById('load-news-btn').disabled = false;
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'none';
+            }
+            if (loadNewsBtn) {
+                loadNewsBtn.disabled = false;
+            }
         });
 }
 
@@ -504,9 +511,9 @@ function formatUrl(url) {
 
 // Setup category filters based on loaded data
 function setupCategoryFilters(jsonData) {
-    if (!jsonData || !jsonData.categories) return;
-    
     const filterContainer = document.getElementById('category-filter');
+    if (!jsonData || !jsonData.categories || !filterContainer) return;
+    
     filterContainer.innerHTML = '<button data-category="all" class="active">All</button>';
     
     activeFilters = ['all']; // Reset active filters
@@ -603,39 +610,41 @@ function applyFiltersAndSearch() {
 function initializeDragAndDrop() {
     const dropZone = document.getElementById("drop-zone");
     
-    dropZone.addEventListener("dragover", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dropZone.classList.add('drag-over');
-    });
+    if (dropZone) {
+        dropZone.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.add('drag-over');
+        });
 
-    dropZone.addEventListener("dragleave", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dropZone.classList.remove('drag-over');
-    });
+        dropZone.addEventListener("dragleave", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.remove('drag-over');
+        });
 
-    dropZone.addEventListener("drop", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dropZone.classList.remove('drag-over');
+        dropZone.addEventListener("drop", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.remove('drag-over');
 
-        try {
-            const data = JSON.parse(e.dataTransfer.getData("text/plain"));
-            if (!curatedItems.some(item => item.text === data.text)) {
-                curatedItems.push(data);
-                updateCuratedItemsDisplay();
-                dropZone.classList.add('drop-feedback');
-                setTimeout(() => dropZone.classList.remove('drop-feedback'), 300);
-                showToast('Item added to curated list');
-            } else {
-                showToast('Item already in curated list', true);
+            try {
+                const data = JSON.parse(e.dataTransfer.getData("text/plain"));
+                if (!curatedItems.some(item => item.text === data.text)) {
+                    curatedItems.push(data);
+                    updateCuratedItemsDisplay();
+                    dropZone.classList.add('drop-feedback');
+                    setTimeout(() => dropZone.classList.remove('drop-feedback'), 300);
+                    showToast('Item added to curated list');
+                } else {
+                    showToast('Item already in curated list', true);
+                }
+            } catch (error) {
+                console.error('Error processing dropped item:', error);
+                showToast('Error adding item', true);
             }
-        } catch (error) {
-            console.error('Error processing dropped item:', error);
-            showToast('Error adding item', true);
-        }
-    });
+        });
+    }
 }
 
 // Update the display of curated items
