@@ -88,46 +88,55 @@ header nav a:hover {
 }
 
 .content-pane {
-    flex: 1 1 50%; /* Adjust basis/grow/shrink */
-    padding: 40px; /* More padding for text content */
+    flex: 1 1 50%; 
+    padding: 20px 40px; 
     box-sizing: border-box;
-    overflow-y: auto; /* Allow scrolling for long text */
+    overflow: hidden; /* Crucial: This clips any final overflow */
     display: flex;
     flex-direction: column;
-    justify-content: center; /* Vertically center content in the pane */
 }
 
 .content-pane h2 {
     margin-top: 0;
-    font-size: 2.2em; /* Larger title for full screen */
+    font-size: 24px; /* Fallback if JS doesn't run or for initial state */
+    line-height: 1.2; 
     color: #1e90ff;
     margin-bottom: 20px;
+    white-space: nowrap; 
+    overflow: hidden;    
+    position: relative; 
+    padding: 0; /* Ensure no padding on h2 itself */
+    /* animation: horizontalTicker 15s linear infinite; /* Removed */
+    /* The fitTextToContainer will try to make it fit */
 }
 
 .content-pane p {
-    font-size: 1.2em; /* Larger text */
-    line-height: 1.7;
-    margin-bottom: 20px;
+    /* font-size: 2.0em; /* Removed: JS will set this */
+    /* Default/fallback font-size */
+    font-size: 14px; /* Fallback if JS doesn't run */
+    line-height: 1.5; /* Adjust based on typical content */
+    margin-bottom: 0; /* Remove bottom margin as it should fill space */
+    flex-grow: 1; 
+    overflow: hidden; /* JS tries to make text fit, this is a final clip */
+    /* The fitTextToContainer will adjust this to fill the available space */
 }
 
-.content-pane .source-links {
-    margin-top: auto; /* Push source links to the bottom of the content pane */
-    padding-top: 20px; /* Space above source links */
-    font-size: 1em;
-    align-self: flex-start; /* Align to the start of the cross axis */
+/* Removed styles for .scroll-content and .scrolling-text */
+/* Removed @keyframes verticalScroll */
+
+@keyframes horizontalTicker {
+    0% {
+        transform: translateX(100%); 
+    }
+    100% {
+        transform: translateX(-100%); 
+    }
 }
 
-.content-pane .source-links a {
-    color: #87ceeb;
-    text-decoration: none;
-    margin-right: 15px;
-    display: inline-block; /* Better spacing */
-    margin-bottom: 5px;
-}
-
-.content-pane .source-links a:hover {
-    text-decoration: underline;
-}
+/* Remove source links styles */
+/* .content-pane .source-links { ... } */
+/* .content-pane .source-links a { ... } */
+/* .content-pane .source-links a:hover { ... } */
 
 @keyframes fadeInAnimation {
     from {
@@ -173,13 +182,13 @@ header nav a:hover {
     }
 
     .content-pane h2 {
-        font-size: 1.8em;
+        font-size: 20px; /* Adjust fallback for smaller screens */
+        /* animation: horizontalTicker 10s linear infinite; /* Optionally adjust speed */
     }
 
     .content-pane p {
-        font-size: 1em;
+        font-size: 12px; /* Adjust fallback for smaller screens */
+        line-height: 1.4;
     }
-    .content-pane .source-links {
-        margin-top: 20px; /* Adjust margin for stacked layout */
-    }
+    /* .content-pane .source-links { ... } /* Ensure this is removed/commented if present */
 } 

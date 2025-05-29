@@ -1,38 +1,180 @@
 document.addEventListener('DOMContentLoaded', () => {
     const newsContainer = document.getElementById('live-news-container');
     const DEFAULT_NEWS_URL = 'https://elizaos.github.io/knowledge/ai-news/elizaos/json/daily.json';
-    const SLIDE_INTERVAL = 2000; // Changed from 5000ms to 2000ms for faster debugging
-    const ANIMATION_DURATION = 500; // 0.5 seconds, should match CSS
-    const DEBUG_DISABLE_FONT_ADJUST = false; // SET TO true TO TEST WITHOUT FONT ADJUSTMENT
+    const SLIDE_INTERVAL = 5000; // User requested 5000ms
+    const ANIMATION_DURATION = 500; 
+    // const DEBUG_DISABLE_FONT_ADJUST = false; // Removed
 
     let allNewsCards = [];
     let currentSlideIndex = -1;
     let slideIntervalId = null;
-    let isTransitioning = false; // Flag to prevent concurrent transitions
-    console.log('LiveNewsViewer Initialized'); // Initial log
+    let isTransitioning = false; 
+    console.log('LiveNewsViewer Initialized'); 
 
-    // Function to create a news card element
-    function createNewsCard(item) {
+    // NEW FUNCTION: animateCountUp
+    function animateCountUp(element, targetValue, duration = 1500) {
+        if (!element) return;
+        let startValue = 0;
+        const startTime = performance.now();
+
+        function updateCount(currentTime) {
+            const elapsedTime = currentTime - startTime;
+            if (elapsedTime < duration) {
+                const progress = elapsedTime / duration;
+                const currentValue = Math.round(startValue + (targetValue - startValue) * progress);
+                element.textContent = currentValue;
+                requestAnimationFrame(updateCount);
+            } else {
+                element.textContent = targetValue;
+            }
+        }
+        requestAnimationFrame(updateCount);
+    }
+
+    // NEW FUNCTION: createGitHubStatsCard
+    function createGitHubStatsCard(summaryItem, completedItemsData) {
+        const slide = document.createElement('div');
+        slide.classList.add('news-card', 'github-stats-card'); 
+
+        const titleElement = document.createElement('h2');
+        titleElement.textContent = summaryItem.title || "GitHub Activity"; 
+        slide.appendChild(titleElement);
+
+        const statsContainer = document.createElement('div');
+        statsContainer.classList.add('stats-container');
+
+        const text = summaryItem.text || "";
+        let prsOpened = 0, prsMerged = 0, issuesOpened = 0, activeContributors = 0;
+
+        const prsOpenedMatch = text.match(/(\d+)\s+new\s+pull\s+requests/i);
+        if (prsOpenedMatch) prsOpened = parseInt(prsOpenedMatch[1], 10);
+
+        const prsMergedMatch = text.match(/with\s+(\d+)\s+of\s+them\s+merged/i);
+        if (prsMergedMatch) prsMerged = parseInt(prsMergedMatch[1], 10);
+        
+        const issuesOpenedMatch = text.match(/(\d+)\s+new\s+issues\s+were\s+created/i);
+        if (issuesOpenedMatch) issuesOpened = parseInt(issuesOpenedMatch[1], 10);
+
+        const activeContributorsMatch = text.match(/had\s+(\d+)\s+active\s+contributors/i);
+        if (activeContributorsMatch) activeContributors = parseInt(activeContributorsMatch[1], 10);
+        
+        let totalCompletedItems = 0;
+        if (completedItemsData && completedItemsData.content && Array.isArray(completedItemsData.content)) {
+            const completedText = completedItemsData.content[0]?.text || "";
+            const prMatches = completedText.match(/PR\s+#\d+/g);
+            if (prMatches) totalCompletedItems = prMatches.length;
+        }
+
+        // --- PRs and Issues Activity Section (using Charts.css) ---
+        const activitySection = document.createElement('div');
+        activitySection.classList.add('stats-section', 'activity-timeline');
+        const activityTitle = document.createElement('h3');
+        activityTitle.textContent = 'PRs & Issues Activity';
+        activitySection.appendChild(activityTitle);
+
+        const activityData = [
+            { label: 'PRs Opened', value: prsOpened, color: '#28a745' },      // Green
+            { label: 'PRs Merged', value: prsMerged, color: '#6f42c1' },      // Purple
+            { label: 'Issues Opened', value: issuesOpened, color: '#dc3545' } // Red
+        ];
+
+        const maxValue = Math.max(...activityData.map(d => d.value), 1); // Ensure maxValue is at least 1 to avoid division by zero
+
+        const chartTable = document.createElement('table');
+        chartTable.classList.add('charts-css', 'column', 'show-labels', 'show-data-on-hover');
+        // chartTable.style.height = '150px'; // Optional: set a fixed height for the chart
+        // chartTable.style.setProperty('--labels-align', 'center');
+
+        const tableBody = document.createElement('tbody');
+        const tr = document.createElement('tr');
+
+        activityData.forEach(data => {
+            const td = document.createElement('td');
+            const size = data.value / maxValue;
+            td.style.setProperty('--size', `calc(${size})`);
+            td.style.setProperty('--color', data.color);
+            
+            const tooltipSpan = document.createElement('span');
+            tooltipSpan.classList.add('data'); // For Charts.css hover effect
+            tooltipSpan.textContent = data.value;
+
+            const labelSpan = document.createElement('span');
+            labelSpan.classList.add('label');
+            labelSpan.textContent = data.label;
+
+            const valueSpan = document.createElement('span');
+            valueSpan.classList.add('stat-value');
+            valueSpan.dataset.target = data.value;
+            valueSpan.textContent = '0'; // Initial value for animation
+
+            // For Charts.css, the content of <td> often includes the visual bar and labels.
+            // Let's put the animated value inside the label or as part of the structure.
+            // td.innerHTML = `\${data.label}<br><span class="stat-value" data-target="\${data.value}">0</span> <span class="tooltiptext">\${data.value}</span>`;
+            // More structured approach:
+            td.appendChild(tooltipSpan); // This is usually the bar itself if using <span> inside <td>
+            // td.appendChild(labelSpan); // Charts.css uses <th> for labels usually, or specific classes
+            // For simplicity, we'll put the animated number and label directly in <td>, 
+            // but Charts.css might style this in specific ways. We might need to adjust based on rendering.
+
+            const contentDiv = document.createElement('div');
+            contentDiv.style.textAlign = 'center'; // Center the text under/over the bar
+            contentDiv.appendChild(valueSpan);
+            contentDiv.appendChild(document.createElement('br'));
+            contentDiv.appendChild(labelSpan);
+
+            td.appendChild(contentDiv);
+            tr.appendChild(td);
+        });
+
+        tableBody.appendChild(tr);
+        chartTable.appendChild(tableBody);
+        activitySection.appendChild(chartTable);
+        statsContainer.appendChild(activitySection);
+
+        const contributorsSection = document.createElement('div');
+        contributorsSection.classList.add('stats-section', 'top-contributors');
+        const contributorsTitle = document.createElement('h3');
+        contributorsTitle.textContent = 'Contributors';
+        contributorsSection.appendChild(contributorsTitle);
+        
+        const activeContributorsEl = document.createElement('p');
+        activeContributorsEl.innerHTML = `Active Contributors: <span class="stat-value" data-target="${activeContributors}">0</span>`;
+        contributorsSection.appendChild(activeContributorsEl);
+        statsContainer.appendChild(contributorsSection);
+
+        const completedSection = document.createElement('div');
+        completedSection.classList.add('stats-section', 'completed-items');
+        const completedTitle = document.createElement('h3');
+        completedTitle.textContent = 'Completed Items';
+        completedSection.appendChild(completedTitle);
+
+        const totalCompletedEl = document.createElement('p');
+        totalCompletedEl.innerHTML = `Total Completed Tasks (from PRs): <span class="stat-value" data-target="${totalCompletedItems}">0</span>`;
+        completedSection.appendChild(totalCompletedEl);
+        statsContainer.appendChild(completedSection);
+        
+        slide.appendChild(statsContainer);
+        return slide;
+    }
+
+    function createNewsCard(item, categoryTitle) {
         const slide = document.createElement('div');
         slide.classList.add('news-card');
-
         const mediaPane = document.createElement('div');
         mediaPane.classList.add('media-pane');
 
         if (item.images && item.images.length > 0) {
             const img = document.createElement('img');
             img.src = item.images[0];
-            img.alt = item.title || 'News image';
+            img.alt = item.title || categoryTitle || 'News image';
             img.onerror = () => { 
                 img.style.display = 'none'; 
-                // Optionally, add a placeholder text or icon in mediaPane
                 const placeholder = document.createElement('p');
                 placeholder.textContent = 'Image not available';
                 mediaPane.appendChild(placeholder);
             };
             mediaPane.appendChild(img);
         } else {
-            // Placeholder if no image
             const placeholder = document.createElement('p');
             placeholder.textContent = 'No media available';
             mediaPane.appendChild(placeholder);
@@ -42,34 +184,30 @@ document.addEventListener('DOMContentLoaded', () => {
         contentPane.classList.add('content-pane');
 
         const titleElement = document.createElement('h2');
-        titleElement.textContent = item.title || 'Untitled';
+        let actualTitle = item.title || categoryTitle || 'Untitled';
+        
+        const MAX_TITLE_LENGTH = 100; // Max length for display title
+        const summaryMarker = "Summary:";
+        const summaryIndex = actualTitle.indexOf(summaryMarker);
+
+        if (summaryIndex !== -1) {
+            actualTitle = actualTitle.substring(0, summaryIndex + summaryMarker.length);
+        } else if (actualTitle.length > MAX_TITLE_LENGTH) {
+            actualTitle = actualTitle.substring(0, MAX_TITLE_LENGTH) + '...';
+        }
+
+        titleElement.textContent = actualTitle;
         contentPane.appendChild(titleElement);
 
         const textElement = document.createElement('p');
         textElement.textContent = item.text || 'No content available.';
         contentPane.appendChild(textElement);
 
-        if (item.sources && item.sources.length > 0) {
-            const sourceLinksContainer = document.createElement('div');
-            sourceLinksContainer.classList.add('source-links');
-            item.sources.forEach(sourceUrl => {
-                const link = document.createElement('a');
-                link.href = sourceUrl;
-                link.target = '_blank';
-                link.rel = 'noopener noreferrer';
-                link.textContent = getHostName(sourceUrl) || 'Source';
-                sourceLinksContainer.appendChild(link);
-            });
-            contentPane.appendChild(sourceLinksContainer);
-        }
-
         slide.appendChild(mediaPane);
         slide.appendChild(contentPane);
-        
         return slide;
     }
 
-    // Helper to get hostname from URL for display
     function getHostName(url) {
         try {
             return new URL(url).hostname;
@@ -78,102 +216,50 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function adjustContentFontSize(contentPane, textElement) {
-        const MAX_FONT_SIZE_PX = 32; // Max desired font size in pixels
-        const MIN_FONT_SIZE_PX = 14; // Min acceptable font size in pixels
-        const FONT_STEP_PX = 1;      // How much to decrease font size by each step
+    function fitTextToContainer(containerElement, textElement, maxFontSize = 48, minFontSize = 12, isHorizontalFit = false) {
+        if (!containerElement || !textElement) return;
 
-        if (!contentPane || !textElement) return;
+        let currentFontSize = maxFontSize;
+        textElement.style.fontSize = `${currentFontSize}px`;
 
-        // Reset font size to max to start calculations
-        textElement.style.fontSize = `${MAX_FONT_SIZE_PX}px`;
+        let checkOverflow;
+        let targetDimensionForLog; // Use a more generic name for logging
 
-        // Iteratively reduce font size if text overflows container height
-        // We also need to consider that the container might have padding.
-        // For an accurate height comparison, ensure box-sizing is border-box for textElement or adjust.
-        // contentPane has overflow-y: auto, so scrollHeight will be reliable on textElement if it's the direct child that might scroll.
-        // However, contentPane itself is the scrolling container.
-        // We want to check if textElement.scrollHeight > contentPane.clientHeight
-        
-        let currentFontSize = MAX_FONT_SIZE_PX;
-        // Ensure textElement is not display:none for scrollHeight to be calculated correctly
-        // The slide itself will be made visible, so this should be fine.
-
-        while (
-            textElement.scrollHeight > contentPane.clientHeight &&
-            currentFontSize > MIN_FONT_SIZE_PX
-        ) {
-            currentFontSize -= FONT_STEP_PX;
-            textElement.style.fontSize = `${currentFontSize}px`;
-            // Re-check scrollHeight with the new font size
-        }
-        // Final check: if it's still too small, set to min (though the loop condition handles this)
-        if (textElement.scrollHeight > contentPane.clientHeight && currentFontSize <= MIN_FONT_SIZE_PX) {
-             textElement.style.fontSize = `${MIN_FONT_SIZE_PX}px`;
-        }
-    }
-
-    function showSlide(index) {
-        if (index === currentSlideIndex || allNewsCards.length === 0 || isTransitioning) return;
-        
-        isTransitioning = true;
-
-        const newSlide = allNewsCards[index];
-        const oldSlide = allNewsCards[currentSlideIndex]; 
-
-        if (newSlide) {
-            newSlide.classList.remove('fade-out'); 
-            newSlide.classList.add('fade-in');    
-        }
-
-        const finalizeNewSlide = () => {
-            if (newSlide) {
-                newSlide.classList.add('active-slide');
-                const contentPane = newSlide.querySelector('.content-pane');
-                const textElement = newSlide.querySelector('.content-pane p');
-                if (contentPane && textElement) {
-                    // Call adjustContentFontSize after the slide is visible and has dimensions
-                    adjustContentFontSize(contentPane, textElement);
-                }
-            }
-            currentSlideIndex = index;
-            isTransitioning = false;
-        };
-
-        if (oldSlide) {
-            oldSlide.classList.remove('fade-in'); 
-            oldSlide.classList.add('fade-out');   
-            
-            setTimeout(() => {
-                oldSlide.classList.remove('active-slide');
-                oldSlide.classList.remove('fade-out'); 
-                finalizeNewSlide();
-            }, ANIMATION_DURATION);
+        if (isHorizontalFit) {
+            const BUFFER_PX = 2; // Reduced buffer from 5 to 2
+            checkOverflow = () => textElement.scrollWidth > (containerElement.clientWidth - BUFFER_PX);
+            targetDimensionForLog = containerElement.clientWidth - BUFFER_PX;
+            // console.log(`Title Fit: Initial - Text: "${textElement.textContent.substring(0,30)}...", scrollW: ${textElement.scrollWidth}, containerClientW: ${containerElement.clientWidth}, TargetW: ${targetDimensionForLog}, Font: ${currentFontSize}px`);
         } else {
-            // First slide
-            finalizeNewSlide();
-            // Set timeout for isTransitioning based on first slide animation if needed, 
-            // but finalizeNewSlide already sets isTransitioning to false. 
-            // This might need a slight re-think if the first animation has issues.
-            // For now, let's assume the fade-in class handles the first animation duration visually.
-            // The isTransitioning flag should ideally be false only after the animation completes.
-            // Let's adjust this for the first slide case more carefully.
-             setTimeout(() => {
-                // isTransitioning = false; // Already handled in finalizeNewSlide for the first slide after it is shown
-                // However, the initial call to finalizeNewSlide for the first slide is immediate.
-                // We need to ensure isTransitioning is true for ANIMATION_DURATION for the first slide too.
-                // The current logic: finalizeNewSlide is called immediately, then sets isTransitioning to false.
-                // This means the interval timer could start before the first animation is done.
-                // Let's put isTransitioning = false for first slide into its own timeout.
-                // No, finalizeNewSlide sets it. The issue is WHEN it's called for first slide.
-            }, ANIMATION_DURATION); // This timeout is just for isTransitioning state for first slide
+            checkOverflow = () => textElement.scrollHeight > containerElement.clientHeight;
+            targetDimensionForLog = containerElement.clientHeight; // For vertical, target is clientHeight
+            // Optional: Add initial log for vertical fit if desired
+            // console.log(`Para Fit: Initial - Text: "${textElement.textContent.substring(0,30)}...", scrollH: ${textElement.scrollHeight}, containerClientH: ${targetDimensionForLog}, Font: ${currentFontSize}px`);
+        }
+
+        let iterations = 0;
+        while (checkOverflow() && currentFontSize > minFontSize) {
+            currentFontSize--;
+            textElement.style.fontSize = `${currentFontSize}px`;
+            iterations++;
+            if (isHorizontalFit) {
+                 // console.log(`Title Fit: Iteration ${iterations} - scrollW: ${textElement.scrollWidth}, TargetW: ${targetDimensionForLog}, New Font: ${currentFontSize}px`);
+            } else {
+                // Optional: Add iteration log for vertical fit
+                // console.log(`Para Fit: Iteration ${iterations} - scrollH: ${textElement.scrollHeight}, TargetH: ${targetDimensionForLog}, New Font: ${currentFontSize}px`);
+            }
+        }
+        if (isHorizontalFit) {
+            // console.log(`Title Fit: Final - scrollW: ${textElement.scrollWidth}, TargetW: ${targetDimensionForLog}, Font: ${currentFontSize}px, Iterations: ${iterations}`);
+        } else {
+            // Optional: Add final log for vertical fit
+            // console.log(`Para Fit: Final - scrollH: ${textElement.scrollHeight}, TargetH: ${targetDimensionForLog}, Font: ${currentFontSize}px, Iterations: ${iterations}`);
+        }
+        // Final check to ensure it doesn't go below minFontSize due to the loop condition
+        if (checkOverflow() && currentFontSize <= minFontSize) {
+            textElement.style.fontSize = `${minFontSize}px`;
         }
     }
-
-    // Minor correction for the first slide scenario in showSlide
-    // The finalizeNewSlide for the first slide runs immediately, setting isTransitioning = false.
-    // If the first slide has an animation (fade-in), isTransitioning should remain true during that period.
-    // Revised structure for showSlide for clarity on first slide transition handling:
 
     function revisedShowSlide(index) {
         console.log(`Attempting to show slide: ${index}, current: ${currentSlideIndex}, transitioning: ${isTransitioning}`);
@@ -191,13 +277,28 @@ document.addEventListener('DOMContentLoaded', () => {
             if (newSlide) {
                 console.log(`Activating new slide: ${index}`);
                 newSlide.classList.add('active-slide');
-                const contentPane = newSlide.querySelector('.content-pane');
-                const textElement = newSlide.querySelector('.content-pane p');
-                if (contentPane && textElement && !DEBUG_DISABLE_FONT_ADJUST) { // Check the flag
-                    console.log(`Adjusting font for slide: ${index}`);
-                    console.time('adjustContentFontSizeTime'); // Start timer
-                    adjustContentFontSize(contentPane, textElement);
-                    console.timeEnd('adjustContentFontSizeTime'); // End timer and log duration
+                
+                // Check if it's a GitHub stats card
+                if (newSlide.classList.contains('github-stats-card')) {
+                    console.log(`Activating GitHub Stats slide content: ${index}`);
+                    const statValues = newSlide.querySelectorAll('.stat-value');
+                    statValues.forEach(el => {
+                        const target = parseInt(el.dataset.target, 10);
+                        animateCountUp(el, target); // Animate numbers
+                    });
+                } else { // Regular news card content adjustment
+                    const contentPane = newSlide.querySelector('.content-pane');
+                    const titleElement = newSlide.querySelector('.content-pane h2');
+                    const paragraphElement = newSlide.querySelector('.content-pane p');
+
+                    if (contentPane && titleElement) {
+                        console.log(`Adjusting title font for slide: ${index}`);
+                        fitTextToContainer(titleElement, titleElement, 60, 24, true);
+                    }
+                    if (paragraphElement) {
+                        console.log(`Adjusting paragraph font for slide: ${index}`);
+                        fitTextToContainer(paragraphElement, paragraphElement, 48, 14, false);
+                    }
                 }
             }
             currentSlideIndex = index;
@@ -205,6 +306,13 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         if (newSlide) {
+            // Reset font sizes for regular cards before animation
+            if (!newSlide.classList.contains('github-stats-card')) {
+                const titleElement = newSlide.querySelector('.content-pane h2');
+                const paragraphElement = newSlide.querySelector('.content-pane p');
+                if(titleElement) titleElement.style.fontSize = ''; 
+                if(paragraphElement) paragraphElement.style.fontSize = ''; 
+            }
             newSlide.classList.remove('fade-out');
             newSlide.classList.add('fade-in');
         }
@@ -213,16 +321,24 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log(`Fading out old slide: ${currentSlideIndex}`);
             oldSlide.classList.remove('fade-in');
             oldSlide.classList.add('fade-out');
+            
             setTimeout(() => {
                 console.log(`Old slide ${currentSlideIndex} fade out complete.`);
                 oldSlide.classList.remove('active-slide');
                 oldSlide.classList.remove('fade-out');
+                // Reset font sizes of old regular slide 
+                if (!oldSlide.classList.contains('github-stats-card')) {
+                    const oldTitle = oldSlide.querySelector('.content-pane h2');
+                    const oldParagraph = oldSlide.querySelector('.content-pane p');
+                    if(oldTitle) oldTitle.style.fontSize = '';
+                    if(oldParagraph) oldParagraph.style.fontSize = '';
+                }
+
                 activateAndAdjustNewSlide();
                 isTransitioning = false; 
                 console.log(`Set isTransitioning = false (after old slide ${currentSlideIndex} out, new slide ${index} in)`);
             }, ANIMATION_DURATION);
         } else {
-            // First slide
             console.log('First slide scenario');
             activateAndAdjustNewSlide();
             setTimeout(() => {
@@ -243,7 +359,6 @@ document.addEventListener('DOMContentLoaded', () => {
         revisedShowSlide(nextIndex);
     }
 
-    // Function to load and display news with animation
     async function loadAndDisplayNews() {
         console.log('Loading and displaying news...');
         try {
@@ -253,28 +368,57 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const jsonData = await response.json();
 
+            let gitHubSummaryData = null;
+            let completedItemsCategoryData = null;
+            allNewsCards = []; // Clear existing cards before loading new ones
+            newsContainer.innerHTML = ''; // Clear the container
+            currentSlideIndex = -1; // Reset slide index
+            if(slideIntervalId) clearInterval(slideIntervalId); // Clear existing interval
+
             if (jsonData && jsonData.categories && Array.isArray(jsonData.categories)) {
                 jsonData.categories.forEach(category => {
+                    if (category.topic === 'github_summary' && category.content && category.content.length > 0) {
+                        gitHubSummaryData = category.content[0]; 
+                        if (category.title && !gitHubSummaryData.title) gitHubSummaryData.title = category.title; 
+                    }
+                    if (category.topic === 'completed_items') {
+                        completedItemsCategoryData = category;
+                    }
+                });
+
+                if (gitHubSummaryData) {
+                    const statsCard = createGitHubStatsCard(gitHubSummaryData, completedItemsCategoryData);
+                    newsContainer.appendChild(statsCard);
+                    allNewsCards.push(statsCard);
+                    console.log('Created GitHub Stats card.');
+                }
+
+                jsonData.categories.forEach(category => {
+                    if (category.topic === 'github_summary' || category.topic === 'completed_items') {
+                        return; 
+                    }
                     if (category.content && Array.isArray(category.content)) {
                         category.content.forEach(item => {
-                            if (!item.title && category.title) {
-                                item.title = `${category.title}: ${item.text.substring(0, 50)}...`;
-                            } else if (!item.title) {
-                                item.title = `${item.text.substring(0, 50)}...`;
-                            }
-                            const newsItemCard = createNewsCard(item);
+                            if (item === gitHubSummaryData && gitHubSummaryData !== null) return; 
+
+                            const newsItemCard = createNewsCard(item, category.title);
                             newsContainer.appendChild(newsItemCard);
                             allNewsCards.push(newsItemCard);
                         });
                     }
                 });
 
-                console.log(`Created ${allNewsCards.length} news cards.`);
+                console.log(`Total cards created (including stats): ${allNewsCards.length}`);
                 if (allNewsCards.length > 0) {
-                    revisedShowSlide(0); // Show the first slide immediately
-                    if (allNewsCards.length > 1) { // Only start interval if there's more than one slide
-                       console.log('Starting slide interval');
-                       slideIntervalId = setInterval(nextSlide, SLIDE_INTERVAL + ANIMATION_DURATION); // Add animation duration to interval
+                    revisedShowSlide(0); 
+                    if (allNewsCards.length > 1) { 
+                       console.log(`Starting slide interval. Expected delay: ${SLIDE_INTERVAL + ANIMATION_DURATION}ms`);
+                       let intervalCount = 0;
+                       slideIntervalId = setInterval(() => {
+                           intervalCount++;
+                           console.log(`setInterval TICK #${intervalCount} - Calling nextSlide. isTransitioning: ${isTransitioning}`);
+                           nextSlide();
+                       }, SLIDE_INTERVAL + ANIMATION_DURATION);
                     } else {
                         console.log('Only one slide, not starting interval.');
                     }
@@ -294,29 +438,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     loadAndDisplayNews();
-
-    // Optional: Pause slideshow on hover, resume on mouseout
-    newsContainer.addEventListener('mouseenter', () => {
-        console.log('Mouse enter - clearing interval');
-        if (slideIntervalId) {
-            clearInterval(slideIntervalId);
-            slideIntervalId = null; // Explicitly set to null after clearing
-        }
-    });
-
-    newsContainer.addEventListener('mouseleave', () => {
-        console.log(`Mouse leave - attempting to restart. slideIntervalId: ${slideIntervalId}, cards: ${allNewsCards.length}`);
-        // Only restart if it was previously cleared by mouseenter (i.e., slideIntervalId is null)
-        // and there is more than one slide to cycle through.
-        if (allNewsCards.length > 1 && slideIntervalId === null) { 
-             console.log('Interval restarting on mouse leave.');
-             slideIntervalId = setInterval(nextSlide, SLIDE_INTERVAL + ANIMATION_DURATION);
-        } else {
-            if (slideIntervalId !== null) {
-                console.log('Interval NOT restarted on mouse leave - interval already active or not cleared by mouseenter.');
-            } else if (allNewsCards.length <= 1) {
-                console.log('Interval NOT restarted on mouse leave - only one or zero slides.');
-            }
-        }
-    });
 }); 

@@ -1,0 +1,98 @@
+/* github-stats.css */
+
+.github-stats-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around; /* Distribute space for a balanced look */
+    align-items: center;
+    background-color: #f0f2f5; /* Light grey background, similar to GitHub's aesthetic */
+    color: #333; /* Darker text for readability */
+    padding: 20px;
+    box-sizing: border-box;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    height: 100%; /* Ensure it takes full height like other cards */
+}
+
+.github-stats-card h2 {
+    font-size: 28px; /* Prominent title */
+    color: #1f2328; /* GitHub-like header color */
+    margin-top: 0;
+    margin-bottom: 20px;
+    text-align: center;
+    width: 100%;
+}
+
+.stats-container {
+    display: flex;
+    flex-direction: row; /* Sections side-by-side */
+    justify-content: space-around;
+    width: 100%;
+    gap: 20px; /* Space between sections */
+    flex-wrap: wrap; /* Allow wrapping on smaller screens if needed */
+}
+
+.stats-section {
+    background-color: #ffffff; /* White background for sections */
+    padding: 15px;
+    border-radius: 6px; /* Rounded corners for sections */
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1); /* Subtle shadow */
+    flex-basis: 30%; /* Distribute space, allowing for some flex */
+    min-width: 200px; /* Minimum width for readability */
+    box-sizing: border-box;
+}
+
+.stats-section h3 {
+    font-size: 18px;
+    color: #586069; /* GitHub secondary text color */
+    margin-top: 0;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #e1e4e8; /* Separator line */
+    padding-bottom: 10px;
+}
+
+.stats-section p {
+    font-size: 16px;
+    line-height: 1.6;
+    margin-bottom: 8px;
+    color: #24292e;
+}
+
+.stats-section .stat-value {
+    font-weight: 600; /* Make numbers stand out */
+    font-size: 22px; /* Larger font for numbers */
+    color: #0366d6; /* GitHub blue for values */
+    min-width: 30px; /* Ensure space for animation */
+    display: inline-block; /* Needed for min-width and proper alignment */
+    text-align: right; /* Align numbers to the right if they were in a column */
+}
+
+/* Specific styling for sections if needed - can be expanded */
+.activity-timeline {}
+.top-contributors {}
+.completed-items {}
+
+/* Responsive adjustments (optional, can be enhanced) */
+@media (max-width: 768px) {
+    .stats-container {
+        flex-direction: column; /* Stack sections vertically on smaller screens */
+        align-items: center;
+    }
+    .stats-section {
+        flex-basis: 80%; /* Allow sections to take more width */
+        min-width: unset;
+        width: 100%;
+        margin-bottom: 15px;
+    }
+    .github-stats-card h2 {
+        font-size: 24px;
+    }
+    .stats-section h3 {
+        font-size: 16px;
+    }
+    .stats-section p {
+        font-size: 14px;
+    }
+    .stats-section .stat-value {
+        font-size: 20px;
+    }
+} 
