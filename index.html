@@ -23,10 +23,17 @@
                     <input type="text" id="search-input" placeholder="Search news...">
                     <button id="search-btn">Search</button>
                 </div>
+                <div class="date-navigation">
+                    <button id="prev-date-btn" title="Previous date">←</button>
+                    <span id="current-date-display">Today</span>
+                    <button id="next-date-btn" title="Next date">→</button>
+                    <button id="today-btn" title="Go to today">Today</button>
+                    <button id="calendar-btn" title="Pick a date">📅</button>
+                </div>
                 <button id="load-news-btn">Load News</button>
                 <button id="view-original-json-btn">View Original JSON</button>
                 <button id="generate-json-btn">Generate Curated JSON</button>
-                <button id="live-news-viewer-btn" onclick="window.location.href='livenewsviewer.html'">Live News Viewer</button>
+                <button id="live-news-viewer-btn">Live News Viewer</button>
             </div>
             <div id="category-filter" class="category-filter"></div>
         </header>
@@ -62,11 +69,15 @@
                     <li><kbd>S</kbd> - Search</li>
                     <li><kbd>V</kbd> - View JSON</li>
                     <li><kbd>G</kbd> - Generate Curated JSON</li>
+                    <li><kbd>←</kbd> - Previous Date</li>
+                    <li><kbd>→</kbd> - Next Date</li>
+                    <li><kbd>T</kbd> - Today</li>
+                    <li><kbd>C</kbd> - Calendar</li>
                     <li><kbd>?</kbd> - Toggle Shortcuts</li>
                 </ul>
             </div>
         </div>
     </div>
-    <script src="script.js"></script>
+    <script type="module" src="app.js"></script>
 </body>
 </html>

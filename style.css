@@ -58,6 +58,66 @@ header {
     flex-wrap: wrap;
 }
 
+.date-navigation {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(51, 145, 255, 0.1);
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(51, 145, 255, 0.3);
+}
+
+.date-navigation button {
+    background: rgba(51, 145, 255, 0.2);
+    border: 1px solid rgba(51, 145, 255, 0.5);
+    color: #3391ff;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    min-width: 32px;
+}
+
+.date-navigation button:hover {
+    background: rgba(51, 145, 255, 0.3);
+    transform: scale(1.05);
+}
+
+.date-navigation button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+#current-date-display {
+    font-weight: 600;
+    color: #3391ff;
+    min-width: 120px;
+    text-align: center;
+    font-size: 14px;
+}
+
+#calendar-btn {
+    font-size: 16px;
+    padding: 6px 8px;
+}
+
+#today-btn {
+    background: rgba(76, 175, 80, 0.2);
+    border: 1px solid rgba(76, 175, 80, 0.5);
+    color: #4caf50;
+    font-weight: 600;
+    padding: 6px 12px;
+    min-width: 60px;
+}
+
+#today-btn:hover {
+    background: rgba(76, 175, 80, 0.3);
+    transform: scale(1.05);
+}
+
 .search-container {
     display: flex;
     flex: 1;

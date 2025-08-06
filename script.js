@@ -1,5 +1,5 @@
 // Constants and state
-const DEFAULT_URL = "https://elizaos.github.io/knowledge/ai-news/elizaos/json/daily.json";
+const DEFAULT_URL = "https://elizaos.github.io/knowledge/the-council/facts/daily.json";
 const STORAGE_KEY = "ai_news_curated_items";
 let curatedItems = [];
 let originalJsonData = null;
@@ -312,6 +312,9 @@ function generateCuratedJson() {
         return;
     }
 
+    // Convert original data to array format for processing
+    const convertedOriginalData = convertJsonFormat(originalJsonData);
+
     // Create new JSON structure maintaining original format
     const curatedJson = {
         type: originalJsonData.type || "dailySummary",
@@ -331,7 +334,7 @@ function generateCuratedJson() {
 
     // Create categories array with curated content
     Object.keys(itemsByCategory).forEach(categoryTitle => {
-        const originalCategory = originalJsonData.categories.find(cat => cat.title === categoryTitle);
+        const originalCategory = convertedOriginalData.categories.find(cat => cat.title === categoryTitle);
         curatedJson.categories.push({
             title: categoryTitle,
             content: itemsByCategory[categoryTitle],
@@ -365,6 +368,8 @@ function loadNews(url = DEFAULT_URL) {
         })
         .then(jsonData => {
             originalJsonData = jsonData;
+            // Convert to array format if needed for processing
+            const convertedData = convertJsonFormat(jsonData);
             
             if (feedContainer) {
                 feedContainer.innerHTML = "";
@@ -372,7 +377,20 @@ function loadNews(url = DEFAULT_URL) {
                 let displayDate = "";
                 let lastUpdated = "";
             
-                if (jsonData.date) {
+                if (jsonData.briefing_date) {
+                    // Handle new date format (YYYY-MM-DD)
+                    const dateParts = jsonData.briefing_date.split('-');
+                    if (dateParts.length === 3) {
+                        const year = parseInt(dateParts[0]);
+                        const month = parseInt(dateParts[1]) - 1; // Month is 0-indexed
+                        const day = parseInt(dateParts[2]);
+                        const dateObj = new Date(year, month, day);
+                        displayDate = formatDate(Math.floor(dateObj.getTime() / 1000));
+                    } else {
+                        displayDate = jsonData.briefing_date;
+                    }
+                    lastUpdated = new Date().toLocaleString();
+                } else if (jsonData.date) {
                     displayDate = formatDate(jsonData.date);
                     lastUpdated = new Date().toLocaleString();
                 } else if (jsonData.title) {
@@ -395,10 +413,12 @@ function loadNews(url = DEFAULT_URL) {
                     feedContainer.appendChild(dateHeader);
                 }
 
-                setupCategoryFilters(jsonData);
+                // Convert to array format if needed
+                const convertedData = convertJsonFormat(jsonData);
+                setupCategoryFilters(convertedData);
 
-                if (jsonData.categories && Array.isArray(jsonData.categories)) {
-                    jsonData.categories.forEach((category) => {
+                if (convertedData.categories && Array.isArray(convertedData.categories)) {
+                    convertedData.categories.forEach((category) => {
                         const categorySection = document.createElement("div");
                         categorySection.classList.add("category-section");
                         categorySection.dataset.category = category.title;
@@ -420,10 +440,67 @@ function loadNews(url = DEFAULT_URL) {
                                 let card = document.createElement("div");
                                 card.classList.add("card");
                                 card.draggable = true;
-                                card.dataset.text = item.text.toLowerCase();
                                 
+                                // Handle different item structures
+                                let itemText = '';
+                                let itemTitle = '';
                                 let sourceLinks = '';
-                                if (item.sources && Array.isArray(item.sources)) {
+                                
+                                if (item.claim) {
+                                    itemText = item.claim;
+                                    itemTitle = item.claim;
+                                } else if (item.title) {
+                                    itemText = item.title;
+                                    itemTitle = item.title;
+                                } else if (item.summary) {
+                                    itemText = item.summary;
+                                    itemTitle = item.summary;
+                                } else if (item.text) {
+                                    itemText = item.text;
+                                    itemTitle = item.text;
+                                } else if (item.feedback_summary) {
+                                    itemText = item.feedback_summary;
+                                    itemTitle = item.feedback_summary;
+                                } else if (item.insight) {
+                                    itemText = item.insight;
+                                    itemTitle = item.insight;
+                                } else if (item.observation) {
+                                    itemText = item.observation;
+                                    itemTitle = item.observation;
+                                } else if (item.event) {
+                                    itemText = item.event;
+                                    itemTitle = item.event;
+                                } else if (item.issue) {
+                                    itemText = item.issue;
+                                    itemTitle = item.issue;
+                                } else {
+                                    itemText = JSON.stringify(item);
+                                    itemTitle = 'Item';
+                                }
+                                
+                                card.dataset.text = itemText.toLowerCase();
+                                
+                                // Handle sources
+                                if (item.source && Array.isArray(item.source)) {
+                                    if (item.source.length === 1) {
+                                        sourceLinks = `<a href="${item.source[0]}" target="_blank" class="source-link">${item.source[0]}</a>`;
+                                    } else if (item.source.length > 1) {
+                                        const toggleId = `sources-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+                                        sourceLinks = `
+                                            <div class="source-toggle">
+                                                <button class="source-toggle-btn" onclick="toggleSourceList('${toggleId}')">
+                                                    ${item.source.length} Sources
+                                                    <span class="toggle-icon">+</span>
+                                                </button>
+                                                <div id="${toggleId}" class="source-list">
+                                                    ${item.source.map(source => 
+                                                        `<a href="${source}" target="_blank">${source}</a>`
+                                                    ).join('')}
+                                                </div>
+                                            </div>
+                                        `;
+                                    }
+                                } else if (item.sources && Array.isArray(item.sources)) {
                                     if (item.sources.length === 1) {
                                         sourceLinks = `<a href="${item.sources[0]}" target="_blank" class="source-link">${item.sources[0]}</a>`;
                                     } else if (item.sources.length > 1) {
@@ -444,15 +521,20 @@ function loadNews(url = DEFAULT_URL) {
                                     }
                                 }
 
-                                const imageUrl = (item.images && item.images.length) ? 
-                                    item.images[0] : 'images/nothumb.png';
+                                // Handle URLs for images or links
+                                let imageUrl = 'images/nothumb.png';
+                                if (item.url) {
+                                    imageUrl = item.url;
+                                } else if (item.images && item.images.length) {
+                                    imageUrl = item.images[0];
+                                }
 
                                 card.innerHTML = `
                                     <div class="card-image">
                                         <img src="${imageUrl}" alt="News thumbnail" onerror="this.src='images/nothumb.png';" />
                                     </div>
                                     <div class="card-content">
-                                        <p>${item.text || "No content available"}</p>
+                                        <p>${itemText || "No content available"}</p>
                                         <div class="source-links">
                                             ${sourceLinks}
                                         </div>
@@ -509,16 +591,73 @@ function formatUrl(url) {
     }
 }
 
+// Convert new JSON format to expected array format
+function convertJsonFormat(jsonData) {
+    if (!jsonData || !jsonData.categories) return jsonData;
+    
+    // If categories is already an array, return as is
+    if (Array.isArray(jsonData.categories)) {
+        return jsonData;
+    }
+    
+    // Convert object format to array format
+    const convertedData = { ...jsonData };
+    convertedData.categories = [];
+    
+    Object.keys(jsonData.categories).forEach(categoryKey => {
+        const categoryData = jsonData.categories[categoryKey];
+        
+        // Handle different category data structures
+        if (Array.isArray(categoryData)) {
+            // Convert array of items to category format
+            convertedData.categories.push({
+                title: categoryKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                content: categoryData,
+                topic: categoryKey
+            });
+        } else if (typeof categoryData === 'object' && categoryData !== null) {
+            // Handle nested objects (like github_updates)
+            if (categoryData.new_issues_prs && Array.isArray(categoryData.new_issues_prs)) {
+                convertedData.categories.push({
+                    title: categoryKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                    content: categoryData.new_issues_prs,
+                    topic: categoryKey
+                });
+            } else if (categoryData.overall_focus && Array.isArray(categoryData.overall_focus)) {
+                // Handle github_updates.overall_focus
+                convertedData.categories.push({
+                    title: categoryKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) + ' - Focus',
+                    content: categoryData.overall_focus,
+                    topic: categoryKey
+                });
+            } else {
+                // Convert object to single item
+                convertedData.categories.push({
+                    title: categoryKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                    content: [categoryData],
+                    topic: categoryKey
+                });
+            }
+        }
+    });
+    
+    return convertedData;
+}
+
 // Setup category filters based on loaded data
 function setupCategoryFilters(jsonData) {
     const filterContainer = document.getElementById('category-filter');
     if (!jsonData || !jsonData.categories || !filterContainer) return;
     
+    // Convert to array format if needed
+    const convertedData = convertJsonFormat(jsonData);
+    if (!convertedData || !Array.isArray(convertedData.categories)) return;
+    
     filterContainer.innerHTML = '<button data-category="all" class="active">All</button>';
     
     activeFilters = ['all']; // Reset active filters
     
-    jsonData.categories.forEach(category => {
+    convertedData.categories.forEach(category => {
         const filterBtn = document.createElement('button');
         filterBtn.textContent = category.title;
         filterBtn.dataset.category = category.title;
@@ -663,14 +802,40 @@ function updateCuratedItemsDisplay() {
         const imageUrl = (item.images && item.images.length) ? 
             item.images[0] : 'images/nothumb.png';
             
+        // Handle different item structures for display
+        let displayText = '';
+        if (item.claim) {
+            displayText = item.claim;
+        } else if (item.title) {
+            displayText = item.title;
+        } else if (item.summary) {
+            displayText = item.summary;
+        } else if (item.text) {
+            displayText = item.text;
+        } else if (item.feedback_summary) {
+            displayText = item.feedback_summary;
+        } else if (item.insight) {
+            displayText = item.insight;
+        } else if (item.observation) {
+            displayText = item.observation;
+        } else if (item.event) {
+            displayText = item.event;
+        } else if (item.issue) {
+            displayText = item.issue;
+        } else {
+            displayText = "No content";
+        }
+        
         // Truncate text for display
-        const displayText = item.text ? 
-            (item.text.length > 50 ? item.text.substring(0, 50) + "..." : item.text) : 
-            "No content";
+        if (displayText.length > 50) {
+            displayText = displayText.substring(0, 50) + "...";
+        }
         
         // Handle sources for curated items   
         let sourceInfo = '';
-        if (item.sources && item.sources.length > 0) {
+        if (item.source && item.source.length > 0) {
+            sourceInfo = `<div class="curated-item-sources">${item.source.length} source${item.source.length > 1 ? 's' : ''}</div>`;
+        } else if (item.sources && item.sources.length > 0) {
             sourceInfo = `<div class="curated-item-sources">${item.sources.length} source${item.sources.length > 1 ? 's' : ''}</div>`;
         }
             

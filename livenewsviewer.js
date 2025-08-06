@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     const newsContainer = document.getElementById('live-news-container');
-    const DEFAULT_NEWS_URL = 'https://elizaos.github.io/knowledge/ai-news/elizaos/json/daily.json';
+    const DEFAULT_NEWS_URL = 'https://elizaos.github.io/knowledge/the-council/facts/daily.json';
     const SLIDE_INTERVAL = 5000; // User requested 5000ms
     const ANIMATION_DURATION = 500; 
     // const DEBUG_DISABLE_FONT_ADJUST = false; // Removed
@@ -10,6 +10,63 @@ document.addEventListener('DOMContentLoaded', () => {
     let slideIntervalId = null;
     let isTransitioning = false; 
     console.log('LiveNewsViewer Initialized'); 
+
+    /**
+     * Convert new JSON format to expected array format
+     * @param {Object} jsonData - JSON data object
+     * @returns {Object} Converted data object
+     */
+    function convertJsonFormat(jsonData) {
+        if (!jsonData || !jsonData.categories) return jsonData;
+        
+        // If categories is already an array, return as is
+        if (Array.isArray(jsonData.categories)) {
+            return jsonData;
+        }
+        
+        // Convert object format to array format
+        const convertedData = { ...jsonData };
+        convertedData.categories = [];
+        
+        Object.keys(jsonData.categories).forEach(categoryKey => {
+            const categoryData = jsonData.categories[categoryKey];
+            
+            // Handle different category data structures
+            if (Array.isArray(categoryData)) {
+                // Convert array of items to category format
+                convertedData.categories.push({
+                    title: categoryKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                    content: categoryData,
+                    topic: categoryKey
+                });
+            } else if (typeof categoryData === 'object' && categoryData !== null) {
+                // Handle nested objects (like github_updates)
+                if (categoryData.new_issues_prs && Array.isArray(categoryData.new_issues_prs)) {
+                    convertedData.categories.push({
+                        title: categoryKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                        content: categoryData.new_issues_prs,
+                        topic: categoryKey
+                    });
+                } else if (categoryData.overall_focus && Array.isArray(categoryData.overall_focus)) {
+                    // Handle github_updates.overall_focus
+                    convertedData.categories.push({
+                        title: categoryKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) + ' - Focus',
+                        content: categoryData.overall_focus,
+                        topic: categoryKey
+                    });
+                } else {
+                    // Convert object to single item
+                    convertedData.categories.push({
+                        title: categoryKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                        content: [categoryData],
+                        topic: categoryKey
+                    });
+                }
+            }
+        });
+        
+        return convertedData;
+    }
 
     // NEW FUNCTION: animateCountUp
     function animateCountUp(element, targetValue, duration = 1500) {
@@ -362,11 +419,29 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadAndDisplayNews() {
         console.log('Loading and displaying news...');
         try {
-            const response = await fetch(DEFAULT_NEWS_URL);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+            // Check if we have stored data from the main page
+            const storedData = localStorage.getItem('liveNewsData');
+            let jsonData;
+            
+            if (storedData) {
+                // Use stored data from main page
+                jsonData = JSON.parse(storedData);
+                console.log('Using stored data from main page');
+            } else {
+                // Fallback to fetching from default URL
+                const response = await fetch(DEFAULT_NEWS_URL);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                jsonData = await response.json();
+                console.log('Fetched data from default URL');
             }
-            const jsonData = await response.json();
+            
+            // Clear stored data after use to prevent stale data
+            localStorage.removeItem('liveNewsData');
+
+            // Convert JSON format if needed (handle object-based categories)
+            const convertedData = convertJsonFormat(jsonData);
 
             let gitHubSummaryData = null;
             let completedItemsCategoryData = null;
@@ -375,8 +450,8 @@ document.addEventListener('DOMContentLoaded', () => {
             currentSlideIndex = -1; // Reset slide index
             if(slideIntervalId) clearInterval(slideIntervalId); // Clear existing interval
 
-            if (jsonData && jsonData.categories && Array.isArray(jsonData.categories)) {
-                jsonData.categories.forEach(category => {
+            if (convertedData && convertedData.categories && Array.isArray(convertedData.categories)) {
+                convertedData.categories.forEach(category => {
                     if (category.topic === 'github_summary' && category.content && category.content.length > 0) {
                         gitHubSummaryData = category.content[0]; 
                         if (category.title && !gitHubSummaryData.title) gitHubSummaryData.title = category.title; 
@@ -393,7 +468,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.log('Created GitHub Stats card.');
                 }
 
-                jsonData.categories.forEach(category => {
+                convertedData.categories.forEach(category => {
                     if (category.topic === 'github_summary' || category.topic === 'completed_items') {
                         return; 
                     }
