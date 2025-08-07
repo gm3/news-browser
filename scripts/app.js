@@ -4,30 +4,30 @@
  */
 
 // Import utilities
-import { safeAddEventListener } from './utils/domUtils.js';
-import { convertJsonFormat, extractItemText, getSourceLinks, getImageUrl } from './utils/dataUtils.js';
-import { formatDate, parseBriefingDate } from './utils/dateUtils.js';
+import { safeAddEventListener } from '../utils/domUtils.js';
+import { convertJsonFormat, extractItemText, getSourceLinks, getImageUrl } from '../utils/dataUtils.js';
+import { formatDate, parseBriefingDate } from '../utils/dateUtils.js';
 
 // Import services
-import { loadNews } from './services/newsService.js';
+import { loadNews } from '../services/newsService.js';
 import { 
     loadSavedItems, 
     saveItems, 
     clearSavedItems, 
     addCuratedItem, 
     removeCuratedItem 
-} from './services/storageService.js';
+} from '../services/storageService.js';
 import { 
     fetchAvailableDates, 
     getCurrentDate, 
     formatDateForDisplay, 
     navigateToDate 
-} from './services/dateService.js';
+} from '../services/dateService.js';
 
 // Import components
-import { showToast, createToastStyles } from './components/Toast.js';
-import { showJsonViewer, showUrlPrompt, createModalStyles } from './components/Modal.js';
-import { showCalendar, createCalendarStyles } from './components/Calendar.js';
+import { showToast, createToastStyles } from '../components/Toast.js';
+import { showJsonViewer, showUrlPrompt, createModalStyles } from '../components/Modal.js';
+import { showCalendar, createCalendarStyles } from '../components/Calendar.js';
 
 // Constants and state
 const DEFAULT_URL = "https://elizaos.github.io/knowledge/the-council/facts/daily.json";
@@ -93,6 +93,23 @@ function initializeEventListeners() {
     // Live News Viewer
     safeAddEventListener('live-news-viewer-btn', 'click', openLiveNewsViewer);
     
+    // Category filter toggle
+    safeAddEventListener('toggle-filters-btn', 'click', toggleCategoryFilters);
+    
+    // Panel controls
+    safeAddEventListener('open-curation-btn', 'click', () => openPanel('curation'));
+    safeAddEventListener('open-chatbot-btn', 'click', () => openPanel('chatbot'));
+    safeAddEventListener('close-panel-btn', 'click', closePanel);
+    
+    // Chatbot controls
+    safeAddEventListener('send-chat-btn', 'click', sendChatMessage);
+    const chatInput = document.getElementById('chat-input');
+    if (chatInput) {
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendChatMessage();
+        });
+    }
+    
     // Keyboard shortcuts toggle
     safeAddEventListener('toggle-shortcuts', 'click', toggleShortcutsPanel);
 }
@@ -143,6 +160,26 @@ function initializeKeyboardShortcuts() {
 function toggleShortcutsPanel() {
     const panel = document.querySelector('.shortcuts-panel');
     panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+}
+
+/**
+ * Toggle category filters visibility
+ */
+function toggleCategoryFilters() {
+    const filterContainer = document.getElementById('category-filter');
+    const toggleBtn = document.getElementById('toggle-filters-btn');
+    
+    if (filterContainer.classList.contains('collapsed')) {
+        filterContainer.classList.remove('collapsed');
+        filterContainer.classList.add('expanded');
+        toggleBtn.textContent = '🔧';
+        toggleBtn.title = 'Hide Filters';
+    } else {
+        filterContainer.classList.remove('expanded');
+        filterContainer.classList.add('collapsed');
+        toggleBtn.textContent = '🔧';
+        toggleBtn.title = 'Show Filters';
+    }
 }
 
 /**
@@ -259,16 +296,6 @@ async function loadNewsFromUrl(url = DEFAULT_URL) {
         if (feedContainer) {
             feedContainer.innerHTML = "";
             
-            if (newsData.displayDate) {
-                const dateHeader = document.createElement("h3");
-                dateHeader.className = "date-header";
-                dateHeader.innerHTML = `
-                    <span>${newsData.displayDate}</span>
-                    <span class="date-refresh">Last refreshed: ${newsData.lastUpdated}</span>
-                `;
-                feedContainer.appendChild(dateHeader);
-            }
-
             setupCategoryFilters(newsData.convertedData);
 
             if (newsData.convertedData.categories && Array.isArray(newsData.convertedData.categories)) {
@@ -405,6 +432,10 @@ function setupCategoryFilters(jsonData) {
         activeFilters = ['all'];
         applyFiltersAndSearch();
     });
+    
+    // Ensure filters start collapsed
+    filterContainer.classList.add('collapsed');
+    filterContainer.classList.remove('expanded');
 }
 
 /**
@@ -637,7 +668,10 @@ async function initializeDateNavigation() {
 function updateDateDisplay() {
     const displayElement = document.getElementById('current-date-display');
     if (displayElement) {
-        if (currentDate === getCurrentDate()) {
+        // Check if we're viewing daily.json (today's news)
+        const isViewingDaily = !currentDate || currentDate === getCurrentDate();
+        
+        if (isViewingDaily) {
             displayElement.textContent = 'Today';
         } else {
             displayElement.textContent = formatDateForDisplay(currentDate);
@@ -653,25 +687,29 @@ function updateDateNavigationButtons() {
     const nextBtn = document.getElementById('next-date-btn');
     
     if (prevBtn && nextBtn) {
-        let currentIndex = availableDates.findIndex(d => d.date === currentDate);
+        // Check if we're currently viewing daily.json (today's news)
+        const isViewingDaily = !currentDate || currentDate === getCurrentDate();
         
-        // If current date is not found, but we're showing "Today", 
-        // find today's date in the available dates
-        if (currentIndex === -1) {
-            const today = getCurrentDate();
-            currentIndex = availableDates.findIndex(d => d.date === today);
+        if (isViewingDaily) {
+            // When viewing daily.json, we can go back to the most recent historical date
+            // but we can't go forward since we're already at "today"
+            prevBtn.disabled = availableDates.length === 0;
+            nextBtn.disabled = true; // Can't go forward from today
+        } else {
+            // When viewing a historical date, find its index
+            let currentIndex = availableDates.findIndex(d => d.date === currentDate);
+            
+            // If not found, use the first available date
+            if (currentIndex === -1 && availableDates.length > 0) {
+                currentIndex = 0;
+            }
+            
+            // Since dates are sorted descending (newest first):
+            // - "Previous" (older) is disabled when at the last index (oldest date)
+            // - "Next" (newer) is disabled when at the first index (newest date)
+            prevBtn.disabled = currentIndex >= availableDates.length - 1;
+            nextBtn.disabled = currentIndex <= 0;
         }
-        
-        // If still not found, use the first available date
-        if (currentIndex === -1 && availableDates.length > 0) {
-            currentIndex = 0;
-        }
-        
-        // Since dates are sorted descending (newest first):
-        // - "Previous" (older) is disabled when at the last index (oldest date)
-        // - "Next" (newer) is disabled when at the first index (newest date)
-        prevBtn.disabled = currentIndex >= availableDates.length - 1;
-        nextBtn.disabled = currentIndex <= 0;
     }
 }
 
@@ -679,23 +717,31 @@ function updateDateNavigationButtons() {
  * Navigate to previous date (older date)
  */
 function navigateToPreviousDate() {
-    let currentIndex = availableDates.findIndex(d => d.date === currentDate);
+    // Check if we're currently viewing daily.json (today's news)
+    const isViewingDaily = !currentDate || currentDate === getCurrentDate();
     
-    // If current date is not found, but we're showing "Today", 
-    // find today's date in the available dates
-    if (currentIndex === -1) {
-        const today = getCurrentDate();
-        currentIndex = availableDates.findIndex(d => d.date === today);
-    }
-    
-    // Since dates are sorted descending (newest first), 
-    // "previous" means going to a higher index (older date)
-    if (currentIndex < availableDates.length - 1) {
-        const newDate = availableDates[currentIndex + 1].date;
-        navigateToDate(newDate, loadNewsFromUrl);
-        currentDate = newDate;
-        updateDateDisplay();
-        updateDateNavigationButtons();
+    if (isViewingDaily) {
+        // When viewing daily.json, go to the most recent historical date
+        if (availableDates.length > 0) {
+            const mostRecentDate = availableDates[0].date;
+            navigateToDate(mostRecentDate, loadNewsFromUrl);
+            currentDate = mostRecentDate;
+            updateDateDisplay();
+            updateDateNavigationButtons();
+        }
+    } else {
+        // When viewing a historical date, find its index and go to the previous one
+        let currentIndex = availableDates.findIndex(d => d.date === currentDate);
+        
+        // Since dates are sorted descending (newest first), 
+        // "previous" means going to a higher index (older date)
+        if (currentIndex < availableDates.length - 1) {
+            const newDate = availableDates[currentIndex + 1].date;
+            navigateToDate(newDate, loadNewsFromUrl);
+            currentDate = newDate;
+            updateDateDisplay();
+            updateDateNavigationButtons();
+        }
     }
 }
 
@@ -703,23 +749,31 @@ function navigateToPreviousDate() {
  * Navigate to next date (newer date)
  */
 function navigateToNextDate() {
-    let currentIndex = availableDates.findIndex(d => d.date === currentDate);
+    // Check if we're currently viewing daily.json (today's news)
+    const isViewingDaily = !currentDate || currentDate === getCurrentDate();
     
-    // If current date is not found, but we're showing "Today", 
-    // find today's date in the available dates
-    if (currentIndex === -1) {
-        const today = getCurrentDate();
-        currentIndex = availableDates.findIndex(d => d.date === today);
-    }
-    
-    // Since dates are sorted descending (newest first), 
-    // "next" means going to a lower index (newer date)
-    if (currentIndex > 0) {
-        const newDate = availableDates[currentIndex - 1].date;
-        navigateToDate(newDate, loadNewsFromUrl);
-        currentDate = newDate;
-        updateDateDisplay();
-        updateDateNavigationButtons();
+    if (isViewingDaily) {
+        // When viewing daily.json, we can't go forward since we're already at "today"
+        return;
+    } else {
+        // When viewing a historical date, find its index and go to the next one
+        let currentIndex = availableDates.findIndex(d => d.date === currentDate);
+        
+        // Since dates are sorted descending (newest first), 
+        // "next" means going to a lower index (newer date)
+        if (currentIndex > 0) {
+            const newDate = availableDates[currentIndex - 1].date;
+            navigateToDate(newDate, loadNewsFromUrl);
+            currentDate = newDate;
+            updateDateDisplay();
+            updateDateNavigationButtons();
+        } else if (currentIndex === 0) {
+            // If we're at the most recent historical date, go back to daily.json
+            loadNewsFromUrl(); // Load daily.json
+            currentDate = getCurrentDate(); // Set to today
+            updateDateDisplay();
+            updateDateNavigationButtons();
+        }
     }
 }
 
@@ -727,22 +781,12 @@ function navigateToNextDate() {
  * Navigate to today's date
  */
 function navigateToToday() {
-    const today = getCurrentDate();
-    
-    // Check if today's date is available
-    const todayIndex = availableDates.findIndex(d => d.date === today);
-    
-    if (todayIndex !== -1) {
-        // Today is available, navigate to it
-        currentDate = today;
-        navigateToDate(today, loadNewsFromUrl);
-        updateDateDisplay();
-        updateDateNavigationButtons();
-        showToast('Navigated to today');
-    } else {
-        // Today is not available, show message
-        showToast('Today\'s date is not available in the archive', true);
-    }
+    // Always load daily.json for "Today"
+    loadNewsFromUrl(); // This loads the default URL (daily.json)
+    currentDate = getCurrentDate(); // Set to today
+    updateDateDisplay();
+    updateDateNavigationButtons();
+    showToast('Navigated to today');
 }
 
 /**
@@ -776,5 +820,71 @@ function openLiveNewsViewer() {
     localStorage.setItem('liveNewsUrl', window.location.href);
     
     // Open the Live News Viewer
-    window.open('livenewsviewer.html', '_blank');
+    window.open('live/livenewsviewer.html', '_blank');
+}
+
+/**
+ * Panel management functions
+ */
+function openPanel(panelType) {
+    const rightPanel = document.getElementById('right-panel');
+    const mainContent = document.querySelector('.main-content');
+    const curationPanel = document.getElementById('curation-panel');
+    const chatbotPanel = document.getElementById('chatbot-panel');
+    
+    // Show the panel
+    rightPanel.classList.add('open');
+    mainContent.classList.add('panel-open');
+    
+    // Show the appropriate panel content
+    if (panelType === 'curation') {
+        curationPanel.style.display = 'flex';
+        chatbotPanel.style.display = 'none';
+    } else if (panelType === 'chatbot') {
+        curationPanel.style.display = 'none';
+        chatbotPanel.style.display = 'flex';
+    }
+    
+    showToast(`Opened ${panelType} panel`);
+}
+
+function closePanel() {
+    const rightPanel = document.getElementById('right-panel');
+    const mainContent = document.querySelector('.main-content');
+    
+    rightPanel.classList.remove('open');
+    mainContent.classList.remove('panel-open');
+    
+    showToast('Panel closed');
+}
+
+function sendChatMessage() {
+    const chatInput = document.getElementById('chat-input');
+    const chatMessages = document.getElementById('chat-messages');
+    const message = chatInput.value.trim();
+    
+    if (!message) return;
+    
+    // Add user message
+    const userMessage = document.createElement('div');
+    userMessage.className = 'message user-message';
+    userMessage.innerHTML = `<p>${message}</p>`;
+    chatMessages.appendChild(userMessage);
+    
+    // Clear input
+    chatInput.value = '';
+    
+    // Simulate bot response (you can replace this with actual AI integration)
+    setTimeout(() => {
+        const botMessage = document.createElement('div');
+        botMessage.className = 'message bot-message';
+        botMessage.innerHTML = `<p>I understand you're asking about "${message}". This is a demo response. In a real implementation, this would connect to an AI service for news analysis and curation assistance.</p>`;
+        chatMessages.appendChild(botMessage);
+        
+        // Scroll to bottom
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }, 1000);
+    
+    // Scroll to bottom
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 } 

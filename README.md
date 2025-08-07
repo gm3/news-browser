@@ -11,17 +11,28 @@ news-browser/
 ├── components/          # UI Components
 │   ├── Toast.js        # Toast notifications
 │   ├── Modal.js        # Modal dialogs and JSON viewer
-│   └── ReactBitsUI.js  # ReactBits enhanced UI components
+│   └── Calendar.js     # Date selection calendar
 ├── utils/              # Utility functions
 │   ├── dateUtils.js    # Date formatting and parsing
 │   ├── domUtils.js     # DOM manipulation helpers
 │   └── dataUtils.js    # Data processing utilities
 ├── services/           # Business logic services
 │   ├── newsService.js  # News fetching and processing
-│   └── storageService.js # localStorage operations
-├── app.js              # Main application file
+│   ├── storageService.js # localStorage operations
+│   └── dateService.js  # Date navigation and management
+├── scripts/            # JavaScript files
+│   ├── app.js          # Main application file
+│   └── script.js       # Legacy script (backup)
+├── css/                # Stylesheets
+│   ├── style.css       # Core styles
+│   └── github-stats.css # GitHub stats styling
+├── live/               # Live News Viewer
+│   ├── livenewsviewer.html
+│   ├── livenewsviewer.js
+│   └── livenewsviewer.css
+├── images/             # Image assets
 ├── index.html          # Main HTML file
-└── style.css           # Core styles
+└── README.md           # Project documentation
 ```
 
 ## 🚀 Features
@@ -32,12 +43,15 @@ news-browser/
 - **Drag & Drop**: Curate items by dragging them to the drop zone
 - **Search & Filter**: Filter by categories and search within content
 - **JSON Generation**: Create curated JSON from selected items
+- **Date Navigation**: Navigate through historical news with forward/back buttons and calendar
+- **Live News Viewer**: Separate viewer for curated content with enhanced display
 
 ### Enhanced UX with ReactBits
 - **Modern Cards**: Gradient backgrounds with hover effects
 - **Enhanced Toasts**: Positioned notifications with icons
 - **Loading Indicators**: Animated spinners with progress bars
 - **Responsive Design**: Grid-based layouts that adapt to screen size
+- **Calendar Component**: Interactive date picker with available dates highlighting
 
 ## 📦 Module Breakdown
 
@@ -92,6 +106,38 @@ news-browser/
 - `clearSavedItems()` - Clear all saved items
 - `addCuratedItem(curatedItems, newItem)` - Add item to curated list
 - `removeCuratedItem(curatedItems, index)` - Remove item from list
+
+## 📁 Project Structure
+
+The project has been organized into a clean, modular structure:
+
+### `/scripts/` - JavaScript Files
+- `app.js` - Main application entry point with modular imports
+- `script.js` - Legacy script (kept for backup/reference)
+
+### `/css/` - Stylesheets
+- `style.css` - Core application styles
+- `github-stats.css` - GitHub statistics styling
+
+### `/live/` - Live News Viewer
+- `livenewsviewer.html` - Standalone viewer page
+- `livenewsviewer.js` - Viewer functionality
+- `livenewsviewer.css` - Viewer-specific styles
+
+### `/components/` - UI Components
+- `Toast.js` - Toast notification system
+- `Modal.js` - Modal dialogs and JSON viewer
+- `Calendar.js` - Date selection calendar
+
+### `/utils/` - Utility Functions
+- `dateUtils.js` - Date formatting and parsing
+- `domUtils.js` - DOM manipulation helpers
+- `dataUtils.js` - Data processing utilities
+
+### `/services/` - Business Logic
+- `newsService.js` - News fetching and processing
+- `storageService.js` - localStorage operations
+- `dateService.js` - Date navigation and management
 
 ## 🎨 ReactBits Integration
 

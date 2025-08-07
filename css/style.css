@@ -39,23 +39,39 @@ header {
     border-bottom: 1px solid #333;
 }
 
-.app-title {
-    margin-bottom: 15px;
+.header-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
 }
 
-.app-title h1 {
-    margin: 0;
-    font-size: 1.8rem;
-    font-weight: 600;
-    color: #3391ff;
-}
-
-.header-controls {
+.header-left {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-top: 10px;
-    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.logo-icon {
+    font-size: 1.5rem;
+}
+
+.logo-text {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #3391ff;
 }
 
 .date-navigation {
@@ -120,8 +136,9 @@ header {
 
 .search-container {
     display: flex;
-    flex: 1;
-    max-width: 400px;
+    align-items: center;
+    max-width: 350px;
+    gap: 8px;
 }
 
 #search-input {
@@ -131,17 +148,58 @@ header {
     border-radius: 4px 0 0 4px;
     background: #2d2d2d;
     color: #fff;
+    min-width: 200px;
 }
 
 #search-btn {
     border-radius: 0 4px 4px 0;
+    padding: 8px 12px;
+    font-size: 14px;
+}
+
+#toggle-filters-btn {
+    padding: 8px 12px;
+    font-size: 14px;
+    border-radius: 4px;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.action-buttons button {
+    padding: 8px 12px;
+    font-size: 16px;
+    min-width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.category-filter-container {
+    margin-top: 10px;
 }
 
 .category-filter {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    margin-top: 15px;
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.category-filter.collapsed {
+    max-height: 0;
+    opacity: 0;
+    margin-top: 0;
+}
+
+.category-filter.expanded {
+    max-height: 100px;
+    opacity: 1;
+    margin-top: 10px;
 }
 
 .category-filter button {
@@ -158,10 +216,82 @@ header {
 
 main {
     flex: 1;
-    overflow-y: auto;
-    padding: 1rem;
+    display: flex;
     background-color: #000;
     position: relative;
+    overflow: hidden;
+}
+
+.main-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    transition: margin-right 0.3s ease;
+}
+
+.main-content.panel-open {
+    margin-right: 400px;
+}
+
+.right-panel {
+    position: fixed;
+    top: 80px; /* Account for header height */
+    right: -400px;
+    width: 400px;
+    height: calc(100vh - 95px); /* Subtract header height + footer height */
+    background: #1a1a1a;
+    border-left: 1px solid #333;
+    transition: right 0.3s ease;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+}
+
+.right-panel.open {
+    right: 0;
+}
+
+.panel-header {
+    padding: 15px;
+    border-bottom: 1px solid #333;
+    display: flex;
+    justify-content: flex-end;
+}
+
+#close-panel-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#close-panel-btn:hover {
+    background: #bd2130;
+}
+
+.panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 15px;
+}
+
+.panel-section {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-section h3 {
+    margin: 0 0 15px 0;
+    color: #fff;
+    font-size: 1.1rem;
 }
 
 .loading-indicator {
@@ -189,38 +319,37 @@ main {
     100% { transform: rotate(360deg); }
 }
 
-/* Footer and curation area */
+/* Footer and panel controls */
 footer {
-    height: 200px;
+    height: 15px;
     background: #1a1a1a;
     border-top: 1px solid #333;
 }
 
 .footer-content {
     display: flex;
-    height: 200px;
-    padding: 15px;
-    gap: 15px;
+    height: 15px;
+    padding: 0;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    color: #888;
 }
 
-.curation-info {
-    display: flex;
-    flex-direction: column;
-    width: 150px;
-    min-width: 150px;
+.footer-content a {
+    color: #888;
+    text-decoration: none;
+    transition: color 0.3s ease;
 }
 
-.curation-info h3 {
-    font-size: 0.9rem;
-    margin: 0 0 10px 0;
-    color: #aaa;
+.footer-content a:hover {
+    color: #fff;
 }
 
 #drop-zone {
-    flex: 1;
-    width: 150px;
-    min-width: 150px;
-    height: 130px;
+    width: 100%;
+    height: 120px;
     border: 2px dashed #666;
     border-radius: 8px;
     display: flex;
@@ -230,6 +359,7 @@ footer {
     transition: all 0.3s ease;
     user-select: none;
     color: #fff;
+    margin-bottom: 15px;
 }
 
 #drop-zone.drag-over {
@@ -239,12 +369,12 @@ footer {
 
 #active-feed {
     flex: 1;
-    min-width: 0;
     background: #1a1a1a;
     border-radius: 8px;
     padding: 15px;
     display: flex;
     flex-direction: column;
+    min-height: 0;
 }
 
 #active-feed h3 {
@@ -253,6 +383,67 @@ footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
+}
+
+/* Chatbot styles */
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    margin-bottom: 15px;
+    padding: 10px;
+    background: #2d2d2d;
+    border-radius: 8px;
+    max-height: 300px;
+}
+
+.message {
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    max-width: 80%;
+}
+
+.bot-message {
+    background: #3391ff;
+    color: white;
+    align-self: flex-start;
+}
+
+.user-message {
+    background: #2d2d2d;
+    color: white;
+    align-self: flex-end;
+    margin-left: auto;
+}
+
+.chat-input {
+    display: flex;
+    gap: 8px;
+    margin-top: auto;
+}
+
+#chat-input {
+    flex: 1;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 4px;
+    background: #2d2d2d;
+    color: #fff;
+}
+
+#send-chat-btn {
+    padding: 8px 16px;
+    background: #3391ff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
 }
 
 .curated-controls {
@@ -694,21 +885,26 @@ button:disabled {
         height: auto;
     }
     
-    .footer-content {
-        flex-direction: column;
-        height: auto;
+    .right-panel {
+        width: 100%;
+        right: -100%;
+        top: 80px; /* Account for header height on mobile */
+        height: calc(100vh - 95px); /* Subtract header height + footer height */
+    }
+    
+    .main-content.panel-open {
+        margin-right: 0;
+    }
+    
+    .panel-content {
+        padding: 10px;
     }
     
     #drop-zone {
-        width: auto;
         height: 80px;
     }
     
-    .curation-info {
-        width: auto;
-    }
-    
-    #active-feed {
+    .chat-messages {
         max-height: 200px;
     }
 }
