@@ -857,10 +857,18 @@ function showDateCalendar() {
     }
     
     showCalendar(availableDates, (selectedDate) => {
-        currentDate = selectedDate;
-        navigateToDate(selectedDate, loadNewsFromUrl);
-        updateDateDisplay();
-        updateDateNavigationButtons();
+        // Check if the selected date is today
+        const today = getCurrentDate();
+        if (selectedDate === today) {
+            // If today is selected, navigate to daily.json
+            navigateToToday();
+        } else {
+            // Otherwise navigate to the specific date
+            currentDate = selectedDate;
+            navigateToDate(selectedDate, loadNewsFromUrl);
+            updateDateDisplay();
+            updateDateNavigationButtons();
+        }
     }, currentDate);
 }
 

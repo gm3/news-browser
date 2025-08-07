@@ -236,7 +236,8 @@ function renderCalendar(container, availableDates, onDateSelect, currentDate) {
     let selectedDate = currentDate ? new Date(currentDate) : today;
     
     // Create available dates set for quick lookup
-    const availableDatesSet = new Set(availableDates.map(d => d.date));
+    // Handle both object format {date, filename, url} and string format
+    const availableDatesSet = new Set(availableDates.map(d => typeof d === 'object' ? d.date : d));
     
     function renderMonth(year, month) {
         const firstDay = new Date(year, month, 1);
@@ -273,10 +274,22 @@ function renderCalendar(container, availableDates, onDateSelect, currentDate) {
                 <div class="calendar-day-header">Fri</div>
                 <div class="calendar-day-header">Sat</div>
                 ${days.map(day => {
-                    const dateStr = day.toISOString().split('T')[0];
+                    // Format date as YYYY-MM-DD without timezone issues
+                    const year = day.getFullYear();
+                    const month = String(day.getMonth() + 1).padStart(2, '0');
+                    const date = String(day.getDate()).padStart(2, '0');
+                    const dateStr = `${year}-${month}-${date}`;
+                    
                     const isAvailable = availableDatesSet.has(dateStr);
                     const isSelected = selectedDate && dateStr === selectedDate.toISOString().split('T')[0];
-                    const isToday = dateStr === today.toISOString().split('T')[0];
+                    
+                    // Format today's date for comparison
+                    const todayDate = new Date();
+                    const todayYear = todayDate.getFullYear();
+                    const todayMonth = String(todayDate.getMonth() + 1).padStart(2, '0');
+                    const todayDay = String(todayDate.getDate()).padStart(2, '0');
+                    const todayStr = `${todayYear}-${todayMonth}-${todayDay}`;
+                    const isToday = dateStr === todayStr;
                     const isOtherMonth = day.getMonth() !== month;
                     
                     let className = 'calendar-day';
@@ -313,7 +326,13 @@ function renderCalendar(container, availableDates, onDateSelect, currentDate) {
         });
         
         container.querySelector('#today-btn').addEventListener('click', () => {
-            const today = new Date().toISOString().split('T')[0];
+            // Format today's date as YYYY-MM-DD without timezone issues
+            const todayDate = new Date();
+            const year = todayDate.getFullYear();
+            const month = String(todayDate.getMonth() + 1).padStart(2, '0');
+            const date = String(todayDate.getDate()).padStart(2, '0');
+            const today = `${year}-${month}-${date}`;
+            
             if (availableDatesSet.has(today)) {
                 selectedDate = new Date(today);
                 onDateSelect(today);
