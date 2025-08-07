@@ -49,6 +49,7 @@
                         <button id="live-news-viewer-btn" title="Live News Viewer">📺</button>
                         <button id="open-curation-btn" title="Open curation panel">📋</button>
                         <button id="open-chatbot-btn" title="Open AI chatbot">🤖</button>
+                         <button id="toggle-shortcuts" title="Help / Shortcuts">❔</button>
                     </div>
                 </div>
                 <div class="mobile-menu-toggle">
@@ -108,6 +109,9 @@
                         <button class="carousel-nav next" id="main-news-next">›</button>
                     </div>
 
+                    <div id="news-ticker" class="news-ticker" aria-label="Live news ticker" title="Live news ticker">
+                        <div class="news-ticker-track" id="news-ticker-track"></div>
+                    </div>
                     <div class="column-header" style="margin-top: 12px;">
                         <h2>Development</h2>
                     </div>
@@ -148,8 +152,6 @@
                 </div>
                 <div class="panel-content">
                     <div id="curation-panel" class="panel-section">
-                        <h3>Drag items here to curate</h3>
-                        <div id="drop-zone" class="drop-zone">Drop</div>
                         <div id="active-feed" class="active-feed">
                             <h3>Curated Items (<span id="curated-count">0</span>)</h3>
                             <div class="curated-controls">
@@ -196,7 +198,6 @@
             </div>
         </footer>
         <div id="keyboard-shortcuts" class="keyboard-shortcuts">
-            <button id="toggle-shortcuts">?</button>
             <div class="shortcuts-panel">
                 <h3>Keyboard Shortcuts</h3>
                 <ul>

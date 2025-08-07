@@ -37,17 +37,20 @@ news-browser/
 - **News Fetching**: Loads news from [ElizaOS daily feed](https://elizaos.github.io/knowledge/the-council/facts/daily.json)
 - **Historical Navigation**: Browse through historical news with forward/back buttons and calendar
 - **Date Navigation**: Compact date browser with Today button and calendar picker
-- **Search & Filter**: Real-time search and collapsible category filters
-- **Drag & Drop Curation**: Curate items by dragging them to the drop zone
+- **Search & Filter**: Real-time search and collapsible category filters that work across all layouts
+- **Curation (Star Toggle)**: Curate items directly from cards using a small star icon in the top-right
 - **JSON Generation**: Create curated JSON from selected items
-- **Live News Viewer**: Separate viewer for curated content with enhanced display
+- **Live News Viewer**: Full-screen text-centric viewer for curated content
 
 ### Modern UI/UX
+- **Newspaper Layout (default)**: 2-column (65% / 35%). Left: Main & Development with horizontal sub-carousels. Right: Community & Market with a vertical carousel
+- **Masonry Layout**: Toggle via the brick button to switch to a responsive multi-column grid
+- **News Ticker**: Horizontal ticker between Main News and Development showing randomized headlines across categories
 - **Responsive Design**: Mobile-first approach with hamburger menu
-- **Sliding Panels**: Right panel for curation and AI chatbot
-- **Compact Header**: Icon-based action buttons and space-efficient layout
-- **Mobile Optimization**: Bottom-sliding panels on mobile devices
-- **Modern Cards**: Enhanced visual design with hover effects
+- **Sliding Panels**: Right panel for curated items and AI chatbot
+- **Compact Header**: Black-and-white newspaper aesthetic and icon-based actions (Help in header)
+- **Modern Cards**: Compact wireframe look, glassmorphism, image fallbacks
+- **Modals**: Click any card to view a detailed metadata modal (supports varied schemas)
 
 ### Enhanced UX with ReactBits
 - **Modern Cards**: Gradient backgrounds with glassmorphism effects
@@ -62,7 +65,7 @@ news-browser/
 - **Logo & Title**: Compact news browser branding
 - **Date Navigation**: Compact date browser with Today/Calendar buttons
 - **Search Bar**: Real-time search functionality
-- **Action Buttons**: Icon-based buttons for Load News, View JSON, Generate, Live News, Curation, and AI Chat
+- **Action Buttons**: Load, View JSON, Generate, Live Viewer, Curation, AI Chat, Layout toggle, Help
 - **Filters Toggle**: Collapsible category filters (collapsed by default)
 
 ### Mobile Menu
@@ -73,17 +76,17 @@ news-browser/
 - **Mobile Actions**: All action buttons in mobile format
 
 ### Right Panel
-- **Curation Panel**: Drag and drop area for curating news items
+- **Curated Items Grid**: Responsive grid of starred items; clear/save actions
 - **AI Chatbot Panel**: AI chat interface
-- **Toggle Functionality**: Switch between curation and chatbot modes
+- **Toggle Functionality**: Switch between curated items and chatbot
 - **Responsive Behavior**: Slides from right on desktop, from bottom on mobile
 
 ## 📱 Responsive Design
 
 ### Desktop Layout
-- **Two-Column Layout**: Main content and right panel when expanded
+- **Two-Column Layout (65/35)**: Main content on the left, Community/Market on the right
 - **Fixed Header**: Compact header with all controls
-- **Sliding Right Panel**: Contextual panel for curation and AI chat
+- **Sliding Right Panel**: Contextual panel for curated items and AI chat
 
 ### Mobile Layout
 - **Hamburger Menu**: All controls accessible via slide-out menu
@@ -105,10 +108,10 @@ news-browser/
 - **Date Display**: Shows current date in MM/DD/YY format
 
 ### Curation Workflow
-1. Drag news items to the right panel
-2. Items are automatically added to curated list
-3. Use "Generate Curated JSON" to create a new JSON file
-4. Save curated items to localStorage for persistence
+1. Click the star icon on any card to add/remove it from the curated list
+2. Open the right panel to review the curated grid; use Clear/Save to manage
+3. Use "Generate Curated JSON" to create a new JSON snapshot
+4. Curated items persist in localStorage
 
 ### Mobile Usage
 1. Use hamburger menu to access all controls
@@ -125,25 +128,27 @@ news-browser/
 - **Service Layer**: News, storage, and date services
 
 ### Data Processing
-- **Format Conversion**: Handles both array and object-based category formats
-- **Error Handling**: Robust error handling with user feedback
-- **Local Storage**: Persistent data storage for curated items
-- **Date Management**: Complex date navigation logic for historical data
+- **Normalization**: Converts heterogeneous category structures to a consistent array via `convertJsonFormat`
+- **Filtering/Search**: Applies filters and search across Newspaper and Masonry layouts
+- **Local Storage**: Persistent curated items
+- **Date Management**: Handles daily feed vs. historical dates; corrects off-by-one via offset and `viewingDaily` state
 
 ### CSS Architecture
 - **Mobile-First**: Responsive design starting from mobile
-- **Flexbox Layout**: Modern layout techniques
+- **Grid & Flexbox**: Newspaper grid (65/35), carousels, and responsive curated grid
+- **Wireframe Theme**: Black-and-white newspaper aesthetic
 - **CSS Transitions**: Smooth animations and transitions
 - **Media Queries**: Responsive breakpoints for different screen sizes
 
 ## 🔄 Recent Updates
 
 ### UI/UX Improvements
-- **Compact Header**: Reduced padding and margins for space efficiency
-- **Icon-Based Actions**: Converted text buttons to icons
-- **Collapsible Filters**: Filters start collapsed by default
-- **Sliding Right Panel**: Contextual panel for curation and AI chat
-- **Mobile Menu**: Complete mobile navigation with hamburger menu
+- **Newspaper Layout**: 65/35 columns; horizontal sub-rows on left, vertical carousel on right
+- **Masonry Layout Toggle**: Quick switch with the brick icon
+- **News Ticker**: Horizontal ticker between Main News and Development
+- **Curation Overhaul**: Star icon on cards replaces drag-and-drop; curated items shown in a responsive grid
+- **Header Polish**: Black-and-white theme, Help button in header, tightened spacing
+- **Modals**: Detail modal for all cards with metadata and raw JSON
 
 ### Date Navigation Enhancements
 - **Compact Date Browser**: Two-line height with minimal spacing
@@ -156,6 +161,14 @@ news-browser/
 - **Bottom Panels**: Right panel slides from bottom on mobile
 - **Touch Optimization**: Larger touch targets and simplified interactions
 - **Content Priority**: News content prioritized on mobile screens
+
+## 🧭 Keyboard Shortcuts
+- `L`: Load news
+- `S`: Focus search
+- `V`: View original JSON
+- `G`: Generate curated JSON
+- Arrow Left/Right: Navigate dates
+- `?`: Toggle shortcuts panel
 
 ## 🎯 Future Enhancements
 

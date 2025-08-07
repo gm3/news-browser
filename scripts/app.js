@@ -36,6 +36,18 @@ let originalJsonData = null;
 let currentCuratedJson = null;
 let activeFilters = [];
 let searchTerm = "";
+
+/**
+ * Determine if an item is already curated
+ * Uses loose matching on common text fields to be resilient across sources
+ */
+function isItemCurated(item) {
+    const keyA = (item && (item.title || item.claim || item.text || item.content)) || "";
+    return curatedItems.some(ci => {
+        const keyB = (ci.title || ci.claim || ci.text || ci.content) || "";
+        return keyA && keyA === keyB;
+    });
+}
 let availableDates = [];
 let currentDateIndex = 0;
 let currentDate = getCurrentDate();
@@ -358,6 +370,8 @@ async function loadNewsFromUrl(url = DEFAULT_URL) {
         populateNewspaperLayout(originalJsonData);
         // Also populate masonry layout
         populateMasonryLayout(originalJsonData);
+        // Build or refresh ticker
+        buildNewsTicker(originalJsonData);
         
         if (feedContainer) {
             feedContainer.innerHTML = "";
@@ -391,6 +405,64 @@ async function loadNewsFromUrl(url = DEFAULT_URL) {
             loadNewsBtn.disabled = false;
         }
     }
+}
+
+/**
+ * Build/refresh the horizontal news ticker between Main and Development
+ */
+function buildNewsTicker(jsonData) {
+    const track = document.getElementById('news-ticker-track');
+    if (!track || !jsonData) return;
+    track.innerHTML = '';
+
+    const converted = convertJsonFormat(jsonData);
+    const categoriesArray = Array.isArray(converted?.categories) ? converted.categories : [];
+
+    const pool = [];
+    categoriesArray.forEach(cat => {
+        (cat.content || []).forEach(item => {
+            const text = item.title || item.claim || item.summary || extractItemText(item);
+            if (text) pool.push({ text, category: cat.title, sentiment: item.sentiment || 'neutral' });
+        });
+    });
+    if (pool.length === 0) return;
+
+    const total = 24;
+    const picks = [];
+    for (let i = 0; i < total; i++) picks.push(pool[Math.floor(Math.random() * pool.length)]);
+    // duplicate for seamless loop
+    const list = picks.concat(picks);
+    list.forEach(info => {
+        const el = document.createElement('div');
+        el.className = 'news-ticker-item';
+        el.title = 'Live news ticker';
+        const badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.textContent = info.category;
+        const txt = document.createElement('span');
+        txt.textContent = info.text;
+        el.appendChild(badge);
+        el.appendChild(txt);
+        el.addEventListener('click', () => openCardDetailModal({ title: info.text, category: info.category, content: info.text }));
+        track.appendChild(el);
+    });
+
+    startTickerAnimation();
+}
+
+function startTickerAnimation() {
+    const track = document.getElementById('news-ticker-track');
+    if (!track) return;
+    let x = 0;
+    const stepPx = 0.5;
+    function raf() {
+        x -= stepPx;
+        const width = track.scrollWidth / 2;
+        if (Math.abs(x) > width) x = 0;
+        track.style.transform = `translateX(${x}px)`;
+        requestAnimationFrame(raf);
+    }
+    requestAnimationFrame(raf);
 }
 
 /**
@@ -439,10 +511,6 @@ function createNewsCard(item, categoryTitle) {
     const imageUrl = getImageUrl(item);
 
     card.innerHTML = `
-        <div class="curate-toggle">
-            <input type="checkbox" title="Curate this item" onchange="window.__curateToggle(this, '${encodeURIComponent(JSON.stringify(item))}')" />
-            <label>Curate</label>
-        </div>
         <div class="card-image">
             <img src="${imageUrl}" alt="News thumbnail" onerror="this.src='images/nothumb.png';" />
         </div>
@@ -1240,20 +1308,7 @@ function createNewspaperCard(data) {
     card.dataset.category = (data.category || '').toLowerCase();
     card.dataset.text = (data.title || '') + ' ' + (data.content || '');
     
-    // Curate checkbox overlay
-    const curate = document.createElement('div');
-    curate.className = 'curate-toggle';
-    const input = document.createElement('input');
-    input.type = 'checkbox';
-    input.title = 'Curate this item';
-    input.addEventListener('change', (e) => {
-        handleCurateToggle(e.target.checked, data);
-    });
-    const lbl = document.createElement('label');
-    lbl.textContent = 'Curate';
-    curate.appendChild(input);
-    curate.appendChild(lbl);
-    card.appendChild(curate);
+    // Curate icon handled in header (no overlay)
 
     const header = document.createElement('div');
     header.className = 'newspaper-card-header';
@@ -1264,17 +1319,37 @@ function createNewspaperCard(data) {
     
     const sentiment = document.createElement('div');
     sentiment.className = `newspaper-card-sentiment ${data.sentiment || 'neutral'}`;
-    
+
+    const right = document.createElement('div');
+    right.className = 'card-right';
+    right.appendChild(sentiment);
+    const curateBtn = document.createElement('button');
+    curateBtn.className = 'curate-icon';
+    curateBtn.type = 'button';
+    const isCur = isItemCurated(data);
+    if (isCur) curateBtn.classList.add('active');
+    curateBtn.textContent = isCur ? '★' : '☆';
+    curateBtn.title = 'Curate';
+    curateBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const willAdd = !curateBtn.classList.contains('active');
+        handleCurateToggle(willAdd, data);
+        curateBtn.classList.toggle('active', willAdd);
+        curateBtn.textContent = willAdd ? '★' : '☆';
+    });
+    right.appendChild(curateBtn);
+
     header.appendChild(category);
-    header.appendChild(sentiment);
+    header.appendChild(right);
     
     const title = document.createElement('div');
     title.className = 'newspaper-card-title';
     title.textContent = data.title;
     
+    // Compact body snippet
     const content = document.createElement('div');
     content.className = 'newspaper-card-content';
-    content.textContent = data.content;
+    content.textContent = data.content || '';
     
     const meta = document.createElement('div');
     meta.className = 'newspaper-card-meta';
@@ -1429,7 +1504,10 @@ function handleCurateToggle(checked, item) {
         }
     } else {
         // Remove first matching item by title/text
-        const idx = curatedItems.findIndex(ci => (ci.title || ci.claim) === (item.title || item.claim));
+        const idx = curatedItems.findIndex(ci =>
+            (ci.title || ci.claim || ci.text) === (item.title || item.claim || item.text)
+            || (ci.content && item.content && ci.content === item.content)
+        );
         if (idx >= 0) {
             curatedItems.splice(idx, 1);
             updateCuratedItemsDisplay();
@@ -1458,21 +1536,25 @@ function initializeCarouselNavigation() {
         
         let currentIndex = 0;
         const items = track.children;
-        const itemWidth = 340; // cards + margins
-        const itemsPerRow = carousel.horizontal ? Math.max(1, Math.floor(track.parentElement.clientWidth / itemWidth)) : 1;
-        const rowHeight = 220; // approximate height for one row
-        const totalSteps = carousel.horizontal
-            ? Math.max(0, Math.ceil(items.length / itemsPerRow) - 1)
-            : Math.max(0, items.length - 1);
+        function computeMetrics() {
+            const itemWidth = 340; // cards + margins
+            const itemsPerRow = carousel.horizontal ? Math.max(1, Math.floor(track.parentElement.clientWidth / itemWidth)) : 1;
+            const rowHeight = 220; // approximate height for one row
+            const totalSteps = carousel.horizontal
+                ? Math.max(0, Math.ceil(items.length / itemsPerRow) - 1)
+                : Math.max(0, Math.ceil((track.scrollHeight - track.parentElement.clientHeight) / rowHeight));
+            return { itemsPerRow, rowHeight, totalSteps, itemWidth };
+        }
+        let metrics = computeMetrics();
         
         function updateCarousel() {
             const transform = carousel.horizontal 
-                ? `translateX(-${currentIndex * itemsPerRow * itemWidth}px)`
-                : `translateY(-${currentIndex * rowHeight}px)`;
+                ? `translateX(-${currentIndex * metrics.itemsPerRow * metrics.itemWidth}px)`
+                : `translateY(-${currentIndex * metrics.rowHeight}px)`;
             track.style.transform = transform;
             
             prevBtn.style.display = currentIndex === 0 ? 'none' : 'flex';
-            nextBtn.style.display = currentIndex >= totalSteps ? 'none' : 'flex';
+            nextBtn.style.display = currentIndex >= metrics.totalSteps ? 'none' : 'flex';
         }
         
         prevBtn.addEventListener('click', () => {
@@ -1483,7 +1565,7 @@ function initializeCarouselNavigation() {
         });
         
         nextBtn.addEventListener('click', () => {
-            if (currentIndex < totalSteps) {
+            if (currentIndex < metrics.totalSteps) {
                 currentIndex++;
                 updateCarousel();
             }
@@ -1500,14 +1582,14 @@ function initializeCarouselNavigation() {
                     handled = true;
                     lastWheelAt = now;
                     const delta = e.deltaX;
-                    if (delta > 0 && currentIndex < totalSteps) { currentIndex++; updateCarousel(); }
+                    if (delta > 0 && currentIndex < metrics.totalSteps) { currentIndex++; updateCarousel(); }
                     if (delta < 0 && currentIndex > 0) { currentIndex--; updateCarousel(); }
                 }
             } else {
                 handled = true;
                 lastWheelAt = now;
                 const delta = e.deltaY;
-                if (delta > 0 && currentIndex < totalSteps) { currentIndex++; updateCarousel(); }
+                if (delta > 0 && currentIndex < metrics.totalSteps) { currentIndex++; updateCarousel(); }
                 if (delta < 0 && currentIndex > 0) { currentIndex--; updateCarousel(); }
             }
             if (handled) e.preventDefault();
@@ -1525,7 +1607,7 @@ function initializeCarouselNavigation() {
             const dy = t.clientY - startY;
             const primary = carousel.horizontal ? dx : dy;
             if (Math.abs(primary) > 40) {
-                if (primary < 0 && currentIndex < totalSteps) {
+                if (primary < 0 && currentIndex < metrics.totalSteps) {
                     currentIndex++;
                     updateCarousel();
                 } else if (primary > 0 && currentIndex > 0) {
@@ -1537,7 +1619,8 @@ function initializeCarouselNavigation() {
         
         // Recompute on resize for responsive rows
         window.addEventListener('resize', () => {
-            currentIndex = Math.min(currentIndex, totalSteps);
+            metrics = computeMetrics();
+            currentIndex = Math.min(currentIndex, metrics.totalSteps);
             updateCarousel();
         });
 
@@ -1596,17 +1679,21 @@ function createSubCarousel(title, cardElements, isVertical = false) {
     // Pagination logic per sub-row
     let index = 0;
     const cardWidth = 320;
-    const perRow = Math.max(1, Math.floor(container.clientWidth / cardWidth));
-    const steps = Math.max(0, Math.ceil(cardElements.length / perRow) - 1);
+    function metrics() {
+        const perRow = Math.max(1, Math.floor(container.clientWidth / cardWidth));
+        const steps = Math.max(0, Math.ceil(cardElements.length / perRow) - 1);
+        return { perRow, steps };
+    }
+    let m = metrics();
 
     function update() {
-        track.style.transform = `translateX(-${index * perRow * cardWidth}px)`;
+        track.style.transform = `translateX(-${index * m.perRow * cardWidth}px)`;
         prev.style.display = index === 0 ? 'none' : 'flex';
-        next.style.display = index >= steps ? 'none' : 'flex';
+        next.style.display = index >= m.steps ? 'none' : 'flex';
     }
 
     prev.addEventListener('click', () => { if (index > 0) { index--; update(); } });
-    next.addEventListener('click', () => { if (index < steps) { index++; update(); } });
+    next.addEventListener('click', () => { if (index < m.steps) { index++; update(); } });
 
     // Wheel/Swipe
     let lastWheel = 0;
@@ -1615,7 +1702,7 @@ function createSubCarousel(title, cardElements, isVertical = false) {
         const now = Date.now();
         if (now - lastWheel < 120) return; lastWheel = now;
         const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-        if (delta > 0 && index < steps) { index++; update(); }
+        if (delta > 0 && index < m.steps) { index++; update(); }
         if (delta < 0 && index > 0) { index--; update(); }
     }, { passive: false });
 
@@ -1623,11 +1710,11 @@ function createSubCarousel(title, cardElements, isVertical = false) {
     container.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; }, { passive: true });
     container.addEventListener('touchend', (e) => {
         const dx = e.changedTouches[0].clientX - sx;
-        if (Math.abs(dx) > 40) { if (dx < 0 && index < steps) { index++; } else if (dx > 0 && index > 0) { index--; } update(); }
+        if (Math.abs(dx) > 40) { if (dx < 0 && index < m.steps) { index++; } else if (dx > 0 && index > 0) { index--; } update(); }
     }, { passive: true });
 
     // Resize
-    window.addEventListener('resize', update);
+    window.addEventListener('resize', () => { m = metrics(); index = Math.min(index, m.steps); update(); });
     update();
 
     wrapper.appendChild(container);
@@ -1663,10 +1750,28 @@ function createMasonryCard(item, categoryTitle) {
     const category = document.createElement('span');
     category.className = 'masonry-card-category';
     category.textContent = categoryTitle;
+    const right = document.createElement('div');
+    right.className = 'card-right';
     const sentiment = document.createElement('span');
     sentiment.className = 'newspaper-card-sentiment ' + (item.sentiment || 'neutral');
+    right.appendChild(sentiment);
+    const curateBtn = document.createElement('button');
+    curateBtn.className = 'curate-icon';
+    curateBtn.type = 'button';
+    const isCur = isItemCurated(item);
+    if (isCur) curateBtn.classList.add('active');
+    curateBtn.textContent = isCur ? '★' : '☆';
+    curateBtn.title = 'Curate';
+    curateBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const willAdd = !curateBtn.classList.contains('active');
+        handleCurateToggle(willAdd, { ...item, category: categoryTitle });
+        curateBtn.classList.toggle('active', willAdd);
+        curateBtn.textContent = willAdd ? '★' : '☆';
+    });
+    right.appendChild(curateBtn);
     header.appendChild(category);
-    header.appendChild(sentiment);
+    header.appendChild(right);
 
     const imageWrap = document.createElement('div');
     imageWrap.className = 'masonry-card-image';
