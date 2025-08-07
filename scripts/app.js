@@ -39,6 +39,7 @@ let searchTerm = "";
 let availableDates = [];
 let currentDateIndex = 0;
 let currentDate = getCurrentDate();
+let viewingDaily = true; // separate state to disambiguate daily.json vs dated files
 
 // Initialize on page load
 document.addEventListener("DOMContentLoaded", () => {
@@ -95,6 +96,9 @@ function initializeEventListeners() {
     
     // Category filter toggle
     safeAddEventListener('toggle-filters-btn', 'click', toggleCategoryFilters);
+    
+    // Layout toggle
+    safeAddEventListener('toggle-layout-btn', 'click', toggleLayoutMode);
     
     // Panel controls
     safeAddEventListener('open-curation-btn', 'click', () => openPanel('curation'));
@@ -344,8 +348,16 @@ async function loadNewsFromUrl(url = DEFAULT_URL) {
     }
     
     try {
+        // Track whether we are viewing the rolling daily feed vs. a fixed dated file
+        viewingDaily = (url === DEFAULT_URL);
         const newsData = await loadNews(url);
         originalJsonData = newsData.originalData;
+        // Expose current data for layout population helpers
+        window.currentJsonData = originalJsonData;
+        // Populate the 3-column newspaper carousels
+        populateNewspaperLayout(originalJsonData);
+        // Also populate masonry layout
+        populateMasonryLayout(originalJsonData);
         
         if (feedContainer) {
             feedContainer.innerHTML = "";
@@ -417,6 +429,7 @@ function createNewsCard(item, categoryTitle) {
     item.category = categoryTitle;
     let card = document.createElement("div");
     card.classList.add("card");
+    card.dataset.category = (categoryTitle || '').toLowerCase();
     card.draggable = true;
     
     const itemText = extractItemText(item);
@@ -426,6 +439,10 @@ function createNewsCard(item, categoryTitle) {
     const imageUrl = getImageUrl(item);
 
     card.innerHTML = `
+        <div class="curate-toggle">
+            <input type="checkbox" title="Curate this item" onchange="window.__curateToggle(this, '${encodeURIComponent(JSON.stringify(item))}')" />
+            <label>Curate</label>
+        </div>
         <div class="card-image">
             <img src="${imageUrl}" alt="News thumbnail" onerror="this.src='images/nothumb.png';" />
         </div>
@@ -445,6 +462,15 @@ function createNewsCard(item, categoryTitle) {
     card.addEventListener("dragend", () => {
         card.classList.remove("dragging");
     });
+
+    // Click opens modal
+    card.addEventListener('click', () => openCardDetailModal({
+        title: item.title || item.claim || 'Details',
+        content: item.summary || item.text || item.feedback_summary || extractItemText(item),
+        category: categoryTitle,
+        source: item.source,
+        sources: item.sources
+    }));
 
     return card;
 }
@@ -524,39 +550,70 @@ function toggleCategoryFilter(button, category) {
  * Apply both category filters and search term
  */
 function applyFiltersAndSearch() {
+    // Original feed filter (legacy list view)
     const sections = document.querySelectorAll('.category-section');
     const showAll = activeFilters.includes('all');
-    
     sections.forEach(section => {
         const categoryName = section.dataset.category;
-        const shouldShowCategory = showAll || activeFilters.includes(categoryName);
-        
-        if (shouldShowCategory) {
-            section.style.display = '';
-            
-            // Apply search filter within visible categories
-            if (searchTerm) {
-                const cards = section.querySelectorAll('.card');
-                let visibleCards = 0;
-                
-                cards.forEach(card => {
-                    const cardText = card.dataset.text;
-                    const matchesSearch = cardText && cardText.includes(searchTerm.toLowerCase());
-                    card.style.display = matchesSearch ? '' : 'none';
-                    if (matchesSearch) visibleCards++;
-                });
-                
-                // If no cards match search in this category, hide the category
-                section.style.display = visibleCards > 0 ? '' : 'none';
-            } else {
-                // Show all cards if no search term
-                section.querySelectorAll('.card').forEach(card => {
-                    card.style.display = '';
-                });
-            }
+        const shouldShowCategory = showAll || activeFilters.some(f => categoryName.toLowerCase().includes(f.toLowerCase()));
+        if (!shouldShowCategory) { section.style.display = 'none'; return; }
+
+        section.style.display = '';
+        const cards = section.querySelectorAll('.card');
+        if (searchTerm) {
+            let visibleCards = 0;
+            cards.forEach(card => {
+                const cardText = (card.dataset.text || '').toLowerCase();
+                const matchesSearch = cardText.includes(searchTerm);
+                card.style.display = matchesSearch ? '' : 'none';
+                if (matchesSearch) visibleCards++;
+            });
+            section.style.display = visibleCards > 0 ? '' : 'none';
         } else {
-            section.style.display = 'none';
+            cards.forEach(card => (card.style.display = '')); 
         }
+    });
+
+    // Newspaper layout filter
+    filterNewspaperLayout();
+
+    // Masonry layout filter
+    filterMasonryLayout();
+}
+
+function filterNewspaperLayout() {
+    const showAll = activeFilters.includes('all');
+    const subRows = document.querySelectorAll('.newspaper-layout .sub-carousel');
+    subRows.forEach(row => {
+        const labelEl = row.querySelector('.sub-title');
+        const rowCategory = labelEl ? labelEl.textContent.trim() : '';
+        const categoryPass = showAll || activeFilters.some(f => rowCategory.toLowerCase().includes(f.toLowerCase()));
+
+        const cards = row.querySelectorAll('.newspaper-card');
+        let visibleCards = 0;
+        cards.forEach(card => {
+            const text = (card.dataset.text || '').toLowerCase();
+            const cat = (card.dataset.category || '').toLowerCase();
+            const matchesSearch = searchTerm ? text.includes(searchTerm) : true;
+            const matchesCategory = categoryPass || activeFilters.some(f => cat.includes(f.toLowerCase()));
+            const show = matchesSearch && matchesCategory;
+            card.style.display = show ? '' : 'none';
+            if (show) visibleCards++;
+        });
+
+        row.style.display = categoryPass && (searchTerm ? visibleCards > 0 : true) ? '' : 'none';
+    });
+}
+
+function filterMasonryLayout() {
+    const showAll = activeFilters.includes('all');
+    const cards = document.querySelectorAll('#masonry-layout .masonry-card');
+    cards.forEach(card => {
+        const text = (card.dataset.text || '').toLowerCase();
+        const cat = (card.dataset.category || '').toLowerCase();
+        const matchesSearch = searchTerm ? text.includes(searchTerm) : true;
+        const matchesCategory = showAll || activeFilters.some(f => cat.includes(f.toLowerCase()));
+        card.style.display = matchesSearch && matchesCategory ? '' : 'none';
     });
 }
 
@@ -683,6 +740,14 @@ function toggleSourceList(id) {
 // Make functions globally available for onclick handlers
 window.removeItem = removeItem;
 window.toggleSourceList = toggleSourceList;
+window.__curateToggle = (el, encoded) => {
+    try {
+        const item = JSON.parse(decodeURIComponent(encoded));
+        handleCurateToggle(el.checked, item);
+    } catch (e) {
+        console.error('Curate toggle parse error', e);
+    }
+};
 
 /**
  * Initialize date navigation
@@ -703,6 +768,10 @@ async function initializeDateNavigation() {
         
         if (availableDates.length > 0) {
             showToast(`Loaded ${availableDates.length} available dates`);
+            // Ensure currentDate aligns to our offset "today"
+            currentDate = getCurrentDate();
+            updateDateDisplay();
+            updateDateNavigationButtons();
         }
     } catch (error) {
         console.error('Error initializing date navigation:', error);
@@ -723,10 +792,7 @@ function updateDateDisplay() {
     const displayElement = document.getElementById('current-date-display');
     const mobileDisplayElement = document.getElementById('mobile-current-date-display');
     
-    // Check if we're viewing daily.json (today's news)
-    const isViewingDaily = !currentDate || currentDate === getCurrentDate();
-    
-    const displayText = isViewingDaily ? 'Today' : formatDateForDisplay(currentDate);
+    const displayText = viewingDaily ? 'Today' : formatDateForDisplay(currentDate);
     
     if (displayElement) {
         displayElement.textContent = displayText;
@@ -745,10 +811,7 @@ function updateDateNavigationButtons() {
     const nextBtn = document.getElementById('next-date-btn');
     
     if (prevBtn && nextBtn) {
-        // Check if we're currently viewing daily.json (today's news)
-        const isViewingDaily = !currentDate || currentDate === getCurrentDate();
-        
-        if (isViewingDaily) {
+        if (viewingDaily) {
             // When viewing daily.json, we can go back to the most recent historical date
             // but we can't go forward since we're already at "today"
             prevBtn.disabled = availableDates.length === 0;
@@ -775,15 +838,13 @@ function updateDateNavigationButtons() {
  * Navigate to previous date (older date)
  */
 function navigateToPreviousDate() {
-    // Check if we're currently viewing daily.json (today's news)
-    const isViewingDaily = !currentDate || currentDate === getCurrentDate();
-    
-    if (isViewingDaily) {
+    if (viewingDaily) {
         // When viewing daily.json, go to the most recent historical date
         if (availableDates.length > 0) {
             const mostRecentDate = availableDates[0].date;
             navigateToDate(mostRecentDate, loadNewsFromUrl);
             currentDate = mostRecentDate;
+            viewingDaily = false;
             updateDateDisplay();
             updateDateNavigationButtons();
         }
@@ -797,6 +858,7 @@ function navigateToPreviousDate() {
             const newDate = availableDates[currentIndex + 1].date;
             navigateToDate(newDate, loadNewsFromUrl);
             currentDate = newDate;
+            viewingDaily = false;
             updateDateDisplay();
             updateDateNavigationButtons();
         }
@@ -807,10 +869,7 @@ function navigateToPreviousDate() {
  * Navigate to next date (newer date)
  */
 function navigateToNextDate() {
-    // Check if we're currently viewing daily.json (today's news)
-    const isViewingDaily = !currentDate || currentDate === getCurrentDate();
-    
-    if (isViewingDaily) {
+    if (viewingDaily) {
         // When viewing daily.json, we can't go forward since we're already at "today"
         return;
     } else {
@@ -823,12 +882,14 @@ function navigateToNextDate() {
             const newDate = availableDates[currentIndex - 1].date;
             navigateToDate(newDate, loadNewsFromUrl);
             currentDate = newDate;
+            viewingDaily = false;
             updateDateDisplay();
             updateDateNavigationButtons();
         } else if (currentIndex === 0) {
             // If we're at the most recent historical date, go back to daily.json
             loadNewsFromUrl(); // Load daily.json
             currentDate = getCurrentDate(); // Set to today
+            viewingDaily = true;
             updateDateDisplay();
             updateDateNavigationButtons();
         }
@@ -842,6 +903,7 @@ function navigateToToday() {
     // Always load daily.json for "Today"
     loadNewsFromUrl(); // This loads the default URL (daily.json)
     currentDate = getCurrentDate(); // Set to today
+    viewingDaily = true;
     updateDateDisplay();
     updateDateNavigationButtons();
     showToast('Navigated to today');
@@ -866,6 +928,7 @@ function showDateCalendar() {
             // Otherwise navigate to the specific date
             currentDate = selectedDate;
             navigateToDate(selectedDate, loadNewsFromUrl);
+            viewingDaily = false;
             updateDateDisplay();
             updateDateNavigationButtons();
         }
@@ -895,12 +958,16 @@ function openLiveNewsViewer() {
 function openPanel(panelType) {
     const rightPanel = document.getElementById('right-panel');
     const mainContent = document.querySelector('.main-content');
+    const newspaperLayout = document.querySelector('.newspaper-layout');
+    const masonryLayout = document.getElementById('masonry-layout');
     const curationPanel = document.getElementById('curation-panel');
     const chatbotPanel = document.getElementById('chatbot-panel');
     
     // Show the panel
     rightPanel.classList.add('open');
     mainContent.classList.add('panel-open');
+    if (newspaperLayout) newspaperLayout.classList.add('panel-open');
+    if (masonryLayout) masonryLayout.classList.add('panel-open');
     
     // Show the appropriate panel content
     if (panelType === 'curation') {
@@ -917,9 +984,13 @@ function openPanel(panelType) {
 function closePanel() {
     const rightPanel = document.getElementById('right-panel');
     const mainContent = document.querySelector('.main-content');
+    const newspaperLayout = document.querySelector('.newspaper-layout');
+    const masonryLayout = document.getElementById('masonry-layout');
     
     rightPanel.classList.remove('open');
     mainContent.classList.remove('panel-open');
+    if (newspaperLayout) newspaperLayout.classList.remove('panel-open');
+    if (masonryLayout) masonryLayout.classList.remove('panel-open');
     
     showToast('Panel closed');
 }
@@ -1005,3 +1076,639 @@ function updateMobileDateDisplay() {
     // The actual update is handled by updateDateDisplay() which now updates both desktop and mobile
     updateDateDisplay();
 } 
+
+/**
+ * Populate newspaper layout with data
+ */
+function populateNewspaperLayout(jsonData) {
+    if (!jsonData) return;
+
+    // Clear existing content
+    clearNewspaperLayout();
+
+    // Normalize categories to array form for both formats
+    const converted = convertJsonFormat(jsonData);
+    const categoriesArray = Array.isArray(converted?.categories) ? converted.categories : [];
+
+    // Populate columns from normalized categories
+    populateMainNewsColumn(categoriesArray, jsonData);
+    populateDevelopmentColumn(categoriesArray);
+    populateCommunityColumn(categoriesArray);
+
+    // Initialize carousel navigation
+    initializeCarouselNavigation();
+}
+
+/**
+ * Clear all newspaper columns
+ */
+function clearNewspaperLayout() {
+    const columns = ['main-news-carousel', 'dev-news-carousel', 'community-news-carousel'];
+    columns.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) element.innerHTML = '';
+    });
+}
+
+/**
+ * Populate main news column with Twitter highlights and strategic insights
+ */
+function populateMainNewsColumn(categoriesArray, jsonData) {
+    const carousel = document.getElementById('main-news-carousel');
+    if (!carousel) return;
+
+    const row = document.createElement('div');
+    row.className = 'sub-carousel';
+
+    // Add overall summary as featured card when present
+    if (jsonData && jsonData.overall_summary) {
+        const featuredRow = createSubCarousel('Summary', [
+            createNewspaperCard({
+                title: 'Daily Briefing',
+                category: 'Summary',
+                content: jsonData.overall_summary,
+                type: 'summary',
+                featured: true
+            })
+        ]);
+        carousel.appendChild(featuredRow);
+    }
+
+    // Add categories that match Twitter/Strategic themes in separate rows
+    const mainSectionOrder = [
+        // 'Twitter News Highlights', // moved to Community & Market column
+        'Strategic Insights'
+    ];
+    mainSectionOrder.forEach(sectionName => {
+        const cat = categoriesArray.find(c => c.title.toLowerCase().includes(sectionName.toLowerCase()));
+        if (cat) {
+            const cards = (cat.content || []).map(item => createNewspaperCard({
+                title: item.theme || item.title || item.claim || 'Update',
+                category: sectionName,
+                content: item.insight || item.summary || item.claim || item.text || item.observation || '',
+                implications: item.implications_or_questions,
+                sentiment: item.sentiment,
+                type: 'main'
+            }));
+            const rowEl = createSubCarousel(sectionName, cards);
+            carousel.appendChild(rowEl);
+        }
+    });
+}
+
+/**
+ * Populate development column with GitHub updates and technical developments
+ */
+function populateDevelopmentColumn(categoriesArray) {
+    const carousel = document.getElementById('dev-news-carousel');
+    if (!carousel) return;
+
+    // Focus cards first if present
+    categoriesArray
+        .filter(cat => /focus/i.test(cat.title))
+        .forEach(cat => {
+            const cards = (cat.content || []).map(item => createNewspaperCard({
+                title: 'Development Focus',
+                category: 'Focus',
+                content: item.claim || item.summary || extractItemText(item),
+                featured: true,
+                type: 'focus'
+            }));
+            carousel.appendChild(createSubCarousel('Development Focus', cards));
+        });
+
+    // GitHub updates and technical developments with explicit sections
+    const devSectionMap = [
+        { key: 'GitHub Updates', match: /github/i },
+        { key: 'Technical Developments', match: /technical|tech/i }
+    ];
+    devSectionMap.forEach(section => {
+        const cat = categoriesArray.find(c => section.match.test(c.title));
+        if (cat) {
+            const cards = (cat.content || []).map(item => createNewspaperCard({
+                title: item.title || item.development || extractItemText(item),
+                category: section.key,
+                content: item.significance || item.summary || extractItemText(item),
+                author: item.author,
+                number: item.number,
+                status: item.status,
+                url: item.url,
+                type: 'development'
+            }));
+            carousel.appendChild(createSubCarousel(section.key, cards));
+        }
+    });
+}
+
+/**
+ * Populate community column with Discord updates, user feedback, and market analysis
+ */
+function populateCommunityColumn(categoriesArray) {
+    const carousel = document.getElementById('community-news-carousel');
+    if (!carousel) return;
+
+    const communitySectionOrder = [
+        { key: 'Twitter News Highlights', match: /twitter\s+news\s+highlights/i, titleBuilder: (it) => it.title || it.claim || 'Update' },
+        { key: 'Discord Updates', match: /discord/i, titleBuilder: (it) => `#${String(it.channel || '').replace('#','')}` },
+        { key: 'User Feedback', match: /feedback/i, titleBuilder: () => 'User Feedback' },
+        { key: 'Market Analysis', match: /market/i, titleBuilder: () => 'Market Update' }
+    ];
+
+    communitySectionOrder.forEach(section => {
+        const cat = categoriesArray.find(c => section.match.test(c.title));
+        if (cat) {
+            const cards = (cat.content || []).map(item => createNewspaperCard({
+                title: section.titleBuilder(item) || item.title || 'Update',
+                category: section.key,
+                content: item.summary || item.feedback_summary || item.observation || extractItemText(item),
+                participants: item.key_participants,
+                sentiment: item.sentiment,
+                relevance: item.relevance,
+                type: 'community'
+            }));
+            carousel.appendChild(createSubCarousel(section.key, cards, true));
+        }
+    });
+}
+
+/**
+ * Create a newspaper card element
+ */
+function createNewspaperCard(data) {
+    const card = document.createElement('div');
+    card.className = `newspaper-card ${data.featured ? 'featured' : ''} ${data.sentiment === 'negative' ? 'urgent' : ''} ${data.sentiment === 'positive' ? 'success' : ''}`;
+    card.dataset.category = (data.category || '').toLowerCase();
+    card.dataset.text = (data.title || '') + ' ' + (data.content || '');
+    
+    // Curate checkbox overlay
+    const curate = document.createElement('div');
+    curate.className = 'curate-toggle';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.title = 'Curate this item';
+    input.addEventListener('change', (e) => {
+        handleCurateToggle(e.target.checked, data);
+    });
+    const lbl = document.createElement('label');
+    lbl.textContent = 'Curate';
+    curate.appendChild(input);
+    curate.appendChild(lbl);
+    card.appendChild(curate);
+
+    const header = document.createElement('div');
+    header.className = 'newspaper-card-header';
+    
+    const category = document.createElement('span');
+    category.className = 'newspaper-card-category';
+    category.textContent = data.category;
+    
+    const sentiment = document.createElement('div');
+    sentiment.className = `newspaper-card-sentiment ${data.sentiment || 'neutral'}`;
+    
+    header.appendChild(category);
+    header.appendChild(sentiment);
+    
+    const title = document.createElement('div');
+    title.className = 'newspaper-card-title';
+    title.textContent = data.title;
+    
+    const content = document.createElement('div');
+    content.className = 'newspaper-card-content';
+    content.textContent = data.content;
+    
+    const meta = document.createElement('div');
+    meta.className = 'newspaper-card-meta';
+    
+    if (data.author) {
+        const author = document.createElement('span');
+        author.className = 'newspaper-card-author';
+        author.textContent = data.author;
+        meta.appendChild(author);
+    }
+    
+    if (data.number) {
+        const number = document.createElement('span');
+        number.className = 'newspaper-card-number';
+        number.textContent = `#${data.number}`;
+        meta.appendChild(number);
+    }
+    
+    if (data.participants) {
+        const participants = document.createElement('span');
+        participants.className = 'newspaper-card-participants';
+        participants.textContent = `${data.participants.length} participants`;
+        meta.appendChild(participants);
+    }
+    
+    card.appendChild(header);
+    card.appendChild(title);
+    card.appendChild(content);
+    card.appendChild(meta);
+    
+    // Add click handler for more details
+    card.addEventListener('click', () => {
+        openCardDetailModal(data);
+    });
+    
+    return card;
+}
+
+/**
+ * Show detailed view of a card
+ */
+function openCardDetailModal(data) {
+    // Backdrop
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.addEventListener('click', () => {
+        document.body.classList.remove('modal-open');
+        backdrop.remove();
+        modal.remove();
+    });
+
+    const modal = document.createElement('div');
+    modal.className = 'card-detail-modal';
+
+    const header = document.createElement('div');
+    header.className = 'card-detail-header';
+    const title = document.createElement('h3');
+    title.className = 'card-detail-title';
+    title.textContent = data.title || 'Details';
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'modal-close-btn';
+    closeBtn.textContent = 'Close';
+    closeBtn.addEventListener('click', () => {
+        document.body.classList.remove('modal-open');
+        backdrop.remove();
+        modal.remove();
+    });
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+
+    const body = document.createElement('div');
+    body.className = 'card-detail-body';
+
+    // Build content grid
+    const grid = document.createElement('div');
+    grid.className = 'card-detail-grid';
+
+    // Description
+    grid.appendChild(renderDetailSection('Description', data.content || data.summary || data.insight || data.observation || '')); 
+
+    // Meta
+    const metaItems = [];
+    if (data.category) metaItems.push(`<strong>Category:</strong> ${data.category}`);
+    if (data.sentiment) metaItems.push(`<strong>Sentiment:</strong> ${data.sentiment}`);
+    if (data.author) metaItems.push(`<strong>Author:</strong> ${data.author}`);
+    if (data.number) metaItems.push(`<strong>#:</strong> ${data.number}`);
+    if (data.status) metaItems.push(`<strong>Status:</strong> ${data.status}`);
+    if (data.relevance) metaItems.push(`<strong>Relevance:</strong> ${data.relevance}`);
+    if (data.participants) metaItems.push(`<strong>Participants:</strong> ${data.participants.join(', ')}`);
+    grid.appendChild(renderDetailSection('Meta', metaItems.length ? metaItems.join('<br/>') : '—'));
+
+    // Implications / questions
+    if (data.implications) {
+        grid.appendChild(renderDetailSection('Implications', `<ul>${data.implications.map(i => `<li>${i}</li>`).join('')}</ul>`));
+    }
+
+    // Links
+    if (data.url || data.source || data.sources) {
+        const links = [];
+        if (data.url) links.push(`<a href="${data.url}" target="_blank">Primary Link</a>`);
+        const srcArr = data.source || data.sources || [];
+        srcArr.forEach((s, idx) => links.push(`<a href="${s}" target="_blank">Source ${idx + 1}</a>`));
+        grid.appendChild(renderDetailSection('Links', links.join('<br/>')));
+    }
+
+    body.appendChild(grid);
+
+    const footer = document.createElement('div');
+    footer.className = 'card-detail-footer';
+    const close2 = document.createElement('button');
+    close2.textContent = 'Close';
+    close2.className = 'modal-close-btn';
+    close2.addEventListener('click', () => {
+        document.body.classList.remove('modal-open');
+        backdrop.remove();
+        modal.remove();
+    });
+    footer.appendChild(close2);
+
+    modal.appendChild(header);
+    modal.appendChild(body);
+    modal.appendChild(footer);
+    document.body.appendChild(backdrop);
+    document.body.appendChild(modal);
+    document.body.classList.add('modal-open');
+}
+
+function renderDetailSection(title, innerHtml) {
+    const section = document.createElement('div');
+    section.className = 'card-detail-section';
+    const h = document.createElement('h4');
+    h.textContent = title;
+    section.appendChild(h);
+    const div = document.createElement('div');
+    div.innerHTML = innerHtml || '—';
+    section.appendChild(div);
+    return section;
+}
+
+// Curate checkbox integration
+function handleCurateToggle(checked, item) {
+    // Normalize item shape minimally
+    const toStore = { ...item };
+    if (checked) {
+        const result = addCuratedItem(curatedItems, toStore);
+        if (result.success) {
+            curatedItems = result.items;
+            updateCuratedItemsDisplay();
+            showToast('Added to curated');
+        } else {
+            showToast(result.message, true);
+        }
+    } else {
+        // Remove first matching item by title/text
+        const idx = curatedItems.findIndex(ci => (ci.title || ci.claim) === (item.title || item.claim));
+        if (idx >= 0) {
+            curatedItems.splice(idx, 1);
+            updateCuratedItemsDisplay();
+            showToast('Removed from curated');
+        }
+    }
+}
+
+/**
+ * Initialize carousel navigation
+ */
+function initializeCarouselNavigation() {
+    const carousels = [
+        { id: 'main-news-carousel', prev: 'main-news-prev', next: 'main-news-next', horizontal: true },
+        { id: 'dev-news-carousel', prev: 'dev-news-prev', next: 'dev-news-next', horizontal: true },
+        { id: 'community-news-carousel', prev: 'community-news-prev', next: 'community-news-next', horizontal: false }
+    ];
+    
+    carousels.forEach(carousel => {
+        const track = document.getElementById(carousel.id);
+        const prevBtn = document.getElementById(carousel.prev);
+        const nextBtn = document.getElementById(carousel.next);
+        const container = track ? track.parentElement : null;
+        
+        if (!track || !prevBtn || !nextBtn || !container) return;
+        
+        let currentIndex = 0;
+        const items = track.children;
+        const itemWidth = 340; // cards + margins
+        const itemsPerRow = carousel.horizontal ? Math.max(1, Math.floor(track.parentElement.clientWidth / itemWidth)) : 1;
+        const rowHeight = 220; // approximate height for one row
+        const totalSteps = carousel.horizontal
+            ? Math.max(0, Math.ceil(items.length / itemsPerRow) - 1)
+            : Math.max(0, items.length - 1);
+        
+        function updateCarousel() {
+            const transform = carousel.horizontal 
+                ? `translateX(-${currentIndex * itemsPerRow * itemWidth}px)`
+                : `translateY(-${currentIndex * rowHeight}px)`;
+            track.style.transform = transform;
+            
+            prevBtn.style.display = currentIndex === 0 ? 'none' : 'flex';
+            nextBtn.style.display = currentIndex >= totalSteps ? 'none' : 'flex';
+        }
+        
+        prevBtn.addEventListener('click', () => {
+            if (currentIndex > 0) {
+                currentIndex--;
+                updateCarousel();
+            }
+        });
+        
+        nextBtn.addEventListener('click', () => {
+            if (currentIndex < totalSteps) {
+                currentIndex++;
+                updateCarousel();
+            }
+        });
+        
+        // Wheel pagination (scroll to paginate). For horizontal tracks, only intercept horizontal intent
+        let lastWheelAt = 0;
+        container.addEventListener('wheel', (e) => {
+            const now = Date.now();
+            if (now - lastWheelAt < 120) return; // throttle
+            let handled = false;
+            if (carousel.horizontal) {
+                if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+                    handled = true;
+                    lastWheelAt = now;
+                    const delta = e.deltaX;
+                    if (delta > 0 && currentIndex < totalSteps) { currentIndex++; updateCarousel(); }
+                    if (delta < 0 && currentIndex > 0) { currentIndex--; updateCarousel(); }
+                }
+            } else {
+                handled = true;
+                lastWheelAt = now;
+                const delta = e.deltaY;
+                if (delta > 0 && currentIndex < totalSteps) { currentIndex++; updateCarousel(); }
+                if (delta < 0 && currentIndex > 0) { currentIndex--; updateCarousel(); }
+            }
+            if (handled) e.preventDefault();
+        }, { passive: false });
+
+        // Touch swipe pagination
+        let startX = 0, startY = 0;
+        container.addEventListener('touchstart', (e) => {
+            const t = e.touches[0];
+            startX = t.clientX; startY = t.clientY;
+        }, { passive: true });
+        container.addEventListener('touchend', (e) => {
+            const t = e.changedTouches[0];
+            const dx = t.clientX - startX;
+            const dy = t.clientY - startY;
+            const primary = carousel.horizontal ? dx : dy;
+            if (Math.abs(primary) > 40) {
+                if (primary < 0 && currentIndex < totalSteps) {
+                    currentIndex++;
+                    updateCarousel();
+                } else if (primary > 0 && currentIndex > 0) {
+                    currentIndex--;
+                    updateCarousel();
+                }
+            }
+        }, { passive: true });
+        
+        // Recompute on resize for responsive rows
+        window.addEventListener('resize', () => {
+            currentIndex = Math.min(currentIndex, totalSteps);
+            updateCarousel();
+        });
+
+        updateCarousel();
+    });
+} 
+
+/**
+ * Layout toggle between Newspaper and Masonry
+ */
+function toggleLayoutMode() {
+    const newspaper = document.querySelector('.newspaper-layout');
+    const masonry = document.getElementById('masonry-layout');
+    if (!newspaper || !masonry) return;
+    const showingMasonry = masonry.style.display !== 'none';
+    masonry.style.display = showingMasonry ? 'none' : 'block';
+    newspaper.style.display = showingMasonry ? 'grid' : 'none';
+}
+
+// Helper: section divider chip
+function createSectionDivider(text) {
+    const div = document.createElement('div');
+    div.className = 'section-divider';
+    div.textContent = text;
+    return div;
+}
+
+// Helper: create a sub-carousel row inside a column
+function createSubCarousel(title, cardElements, isVertical = false) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'sub-carousel';
+
+    const label = document.createElement('div');
+    label.className = 'sub-title';
+    label.textContent = title;
+    wrapper.appendChild(label);
+
+    const container = document.createElement('div');
+    container.className = 'sub-container';
+    const track = document.createElement('div');
+    track.className = 'sub-track';
+    // If too many items, hint scrolling instead of forcing pagination-only
+    container.style.overflow = 'hidden';
+    cardElements.forEach(el => track.appendChild(el));
+    container.appendChild(track);
+
+    const prev = document.createElement('button');
+    prev.className = 'sub-nav sub-prev';
+    prev.textContent = '‹';
+    const next = document.createElement('button');
+    next.className = 'sub-nav sub-next';
+    next.textContent = '›';
+    container.appendChild(prev);
+    container.appendChild(next);
+
+    // Pagination logic per sub-row
+    let index = 0;
+    const cardWidth = 320;
+    const perRow = Math.max(1, Math.floor(container.clientWidth / cardWidth));
+    const steps = Math.max(0, Math.ceil(cardElements.length / perRow) - 1);
+
+    function update() {
+        track.style.transform = `translateX(-${index * perRow * cardWidth}px)`;
+        prev.style.display = index === 0 ? 'none' : 'flex';
+        next.style.display = index >= steps ? 'none' : 'flex';
+    }
+
+    prev.addEventListener('click', () => { if (index > 0) { index--; update(); } });
+    next.addEventListener('click', () => { if (index < steps) { index++; update(); } });
+
+    // Wheel/Swipe
+    let lastWheel = 0;
+    container.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const now = Date.now();
+        if (now - lastWheel < 120) return; lastWheel = now;
+        const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+        if (delta > 0 && index < steps) { index++; update(); }
+        if (delta < 0 && index > 0) { index--; update(); }
+    }, { passive: false });
+
+    let sx = 0; 
+    container.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; }, { passive: true });
+    container.addEventListener('touchend', (e) => {
+        const dx = e.changedTouches[0].clientX - sx;
+        if (Math.abs(dx) > 40) { if (dx < 0 && index < steps) { index++; } else if (dx > 0 && index > 0) { index--; } update(); }
+    }, { passive: true });
+
+    // Resize
+    window.addEventListener('resize', update);
+    update();
+
+    wrapper.appendChild(container);
+    return wrapper;
+}
+
+/**
+ * Populate Masonry layout with normalized data
+ */
+function populateMasonryLayout(jsonData) {
+    const container = document.getElementById('masonry-layout');
+    if (!container || !jsonData) return;
+    container.innerHTML = '';
+
+    const converted = convertJsonFormat(jsonData);
+    const categoriesArray = Array.isArray(converted?.categories) ? converted.categories : [];
+
+    categoriesArray.forEach(cat => {
+        (cat.content || []).forEach(item => {
+            const card = createMasonryCard(item, cat.title);
+            container.appendChild(card);
+        });
+    });
+}
+
+function createMasonryCard(item, categoryTitle) {
+    const card = document.createElement('div');
+    card.className = 'masonry-card';
+    card.dataset.category = (categoryTitle || '').toLowerCase();
+
+    const header = document.createElement('div');
+    header.className = 'masonry-card-header';
+    const category = document.createElement('span');
+    category.className = 'masonry-card-category';
+    category.textContent = categoryTitle;
+    const sentiment = document.createElement('span');
+    sentiment.className = 'newspaper-card-sentiment ' + (item.sentiment || 'neutral');
+    header.appendChild(category);
+    header.appendChild(sentiment);
+
+    const imageWrap = document.createElement('div');
+    imageWrap.className = 'masonry-card-image';
+    const img = document.createElement('img');
+    img.src = getImageUrl(item);
+    img.alt = 'News image';
+    img.onerror = () => { img.src = 'images/nothumb.png'; };
+    imageWrap.appendChild(img);
+
+    const content = document.createElement('div');
+    content.className = 'masonry-card-content';
+    const title = document.createElement('div');
+    title.className = 'masonry-card-title';
+    title.textContent = item.title || item.claim || item.development || 'Update';
+    const body = document.createElement('div');
+    body.className = 'masonry-card-text';
+    body.textContent = extractItemText(item);
+    content.appendChild(title);
+    content.appendChild(body);
+
+    const meta = document.createElement('div');
+    meta.className = 'masonry-card-meta';
+    if (item.url) {
+        const link = document.createElement('a');
+        link.href = item.url;
+        link.target = '_blank';
+        link.textContent = 'Open';
+        link.style.color = '#3391ff';
+        meta.appendChild(link);
+    } else {
+        const span = document.createElement('span');
+        span.textContent = 'No link';
+        meta.appendChild(span);
+    }
+    const date = document.createElement('span');
+    date.textContent = new Date().toLocaleDateString();
+    meta.appendChild(date);
+
+    card.appendChild(header);
+    card.appendChild(imageWrap);
+    card.appendChild(content);
+    card.appendChild(meta);
+
+    return card;
+}

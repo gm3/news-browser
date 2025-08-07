@@ -215,54 +215,173 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function createNewsCard(item, categoryTitle) {
-        const slide = document.createElement('div');
-        slide.classList.add('news-card');
-        const mediaPane = document.createElement('div');
-        mediaPane.classList.add('media-pane');
+        // Randomized tile sizing
+        const sizeClass = ['size-1','size-2','size-3'][Math.floor(Math.random()*3)];
+        const tallClass = Math.random() < 0.35 ? 'tall' : '';
 
-        if (item.images && item.images.length > 0) {
-            const img = document.createElement('img');
-            img.src = item.images[0];
-            img.alt = item.title || categoryTitle || 'News image';
-            img.onerror = () => { 
-                img.style.display = 'none'; 
-                const placeholder = document.createElement('p');
-                placeholder.textContent = 'Image not available';
-                mediaPane.appendChild(placeholder);
-            };
-            mediaPane.appendChild(img);
-        } else {
-            const placeholder = document.createElement('p');
-            placeholder.textContent = 'No media available';
-            mediaPane.appendChild(placeholder);
+        const tile = document.createElement('div');
+        tile.className = `news-card ${sizeClass} ${tallClass}`;
+
+        const title = document.createElement('h2');
+        title.className = 'headline';
+        const wrap = document.createElement('div');
+        wrap.className = 'snippet-wrap';
+        const text = document.createElement('div');
+        text.className = 'snippet-text';
+
+        const headline = item.title || item.claim || item.development || categoryTitle || 'Update';
+        const body = item.summary || item.text || item.insight || item.observation || item.feedback_summary || '';
+
+        title.textContent = headline;
+        text.textContent = body;
+
+        // Randomize font sizes within sensible ranges
+        const headlineSize = [18,22,26,30,36][Math.floor(Math.random()*5)];
+        const bodySize = [12,14,16,18][Math.floor(Math.random()*4)];
+        title.style.fontSize = `${headlineSize}px`;
+        text.style.fontSize = `${bodySize}px`;
+
+        tile.appendChild(title);
+        wrap.appendChild(text);
+        tile.appendChild(wrap);
+
+        // Drift animation for tiles
+        const driftDuration = 3000 + Math.random()*4000;
+        tile.style.animation = `driftX ${driftDuration}ms ease-in-out alternate infinite`;
+
+        // Scrolling text animation (randomized speed/pause cycle)
+        startScrollLoop(wrap, text);
+
+        // Click to open detail modal with metadata and raw JSON
+        tile.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openTileDetailModal(item, categoryTitle);
+        });
+        return tile;
+    }
+
+    function startScrollLoop(container, content) {
+        // Reset scroll position
+        container.scrollTop = 0;
+        let direction = 1; // 1 down, -1 up
+        let speed = 0.3 + Math.random()*0.8; // px/frame
+        let pauseUntil = 0;
+
+        function step(ts) {
+            if (pauseUntil > ts) { requestAnimationFrame(step); return; }
+
+            // Move
+            container.scrollTop += direction * speed;
+            // Bounce at edges then pause
+            if (container.scrollTop <= 0) {
+                direction = 1;
+                speed = 0.3 + Math.random()*0.9;
+                pauseUntil = ts + 800 + Math.random()*1800; // pause 0.8-2.6s
+            } else if (container.scrollTop + container.clientHeight >= content.scrollHeight - 1) {
+                direction = -1;
+                speed = 0.3 + Math.random()*0.9;
+                pauseUntil = ts + 800 + Math.random()*1800;
+            } else if (Math.random() < 0.004) {
+                // occasional random pause mid-way
+                pauseUntil = ts + 400 + Math.random()*1400;
+            }
+            requestAnimationFrame(step);
         }
+        requestAnimationFrame(step);
+    }
 
-        const contentPane = document.createElement('div');
-        contentPane.classList.add('content-pane');
+    function openTileDetailModal(item, categoryTitle) {
+        const data = item || {};
+        const backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop';
+        const modal = document.createElement('div');
+        modal.className = 'card-detail-modal';
 
-        const titleElement = document.createElement('h2');
-        let actualTitle = item.title || categoryTitle || 'Untitled';
-        
-        const MAX_TITLE_LENGTH = 100; // Max length for display title
-        const summaryMarker = "Summary:";
-        const summaryIndex = actualTitle.indexOf(summaryMarker);
+        const header = document.createElement('div');
+        header.className = 'card-detail-header';
+        const title = document.createElement('h3');
+        title.className = 'card-detail-title';
+        title.textContent = data.title || data.claim || data.development || categoryTitle || 'Details';
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'modal-close-btn';
+        closeBtn.textContent = 'Close';
+        const closeAll = () => {
+            document.body.classList.remove('modal-open');
+            backdrop.remove();
+            modal.remove();
+        };
+        backdrop.addEventListener('click', closeAll);
+        closeBtn.addEventListener('click', closeAll);
+        header.appendChild(title);
+        header.appendChild(closeBtn);
 
-        if (summaryIndex !== -1) {
-            actualTitle = actualTitle.substring(0, summaryIndex + summaryMarker.length);
-        } else if (actualTitle.length > MAX_TITLE_LENGTH) {
-            actualTitle = actualTitle.substring(0, MAX_TITLE_LENGTH) + '...';
-        }
+        const body = document.createElement('div');
+        body.className = 'card-detail-body';
+        const grid = document.createElement('div');
+        grid.className = 'card-detail-grid';
 
-        titleElement.textContent = actualTitle;
-        contentPane.appendChild(titleElement);
+        // Description
+        grid.appendChild(renderDetailSection('Description', escapeHtml(
+            data.summary || data.text || data.insight || data.observation || data.feedback_summary || ''
+        )));
 
-        const textElement = document.createElement('p');
-        textElement.textContent = item.text || 'No content available.';
-        contentPane.appendChild(textElement);
+        // Meta
+        const metaPieces = [];
+        if (categoryTitle) metaPieces.push(`<strong>Category:</strong> ${escapeHtml(categoryTitle)}`);
+        if (data.sentiment) metaPieces.push(`<strong>Sentiment:</strong> ${escapeHtml(data.sentiment)}`);
+        if (data.author) metaPieces.push(`<strong>Author:</strong> ${escapeHtml(data.author)}`);
+        if (data.number) metaPieces.push(`<strong>#:</strong> ${escapeHtml(String(data.number))}`);
+        if (data.status) metaPieces.push(`<strong>Status:</strong> ${escapeHtml(data.status)}`);
+        grid.appendChild(renderDetailSection('Meta', metaPieces.length ? metaPieces.join('<br/>') : '—'));
 
-        slide.appendChild(mediaPane);
-        slide.appendChild(contentPane);
-        return slide;
+        // Links
+        const linksArr = [];
+        if (data.url) linksArr.push(`<a href="${data.url}" target="_blank">Link</a>`);
+        (data.source || data.sources || []).forEach((s, i) => {
+            linksArr.push(`<a href="${s}" target="_blank">Source ${i+1}</a>`);
+        });
+        grid.appendChild(renderDetailSection('Links', linksArr.length ? linksArr.join('<br/>') : '—'));
+
+        // Raw JSON
+        grid.appendChild(renderDetailSection('Raw JSON', `<pre style="margin:0;white-space:pre-wrap">${escapeHtml(JSON.stringify(data, null, 2))}</pre>`));
+
+        body.appendChild(grid);
+
+        const footer = document.createElement('div');
+        footer.className = 'card-detail-footer';
+        const close2 = document.createElement('button');
+        close2.className = 'modal-close-btn';
+        close2.textContent = 'Close';
+        close2.addEventListener('click', closeAll);
+        footer.appendChild(close2);
+
+        modal.appendChild(header);
+        modal.appendChild(body);
+        modal.appendChild(footer);
+        document.body.appendChild(backdrop);
+        document.body.appendChild(modal);
+        document.body.classList.add('modal-open');
+    }
+
+    function renderDetailSection(title, innerHtml) {
+        const section = document.createElement('div');
+        section.className = 'card-detail-section';
+        const h = document.createElement('h4');
+        h.textContent = title;
+        section.appendChild(h);
+        const div = document.createElement('div');
+        div.innerHTML = innerHtml || '—';
+        section.appendChild(div);
+        return section;
+    }
+
+    function escapeHtml(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     function getHostName(url) {
@@ -461,12 +580,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
 
-                if (gitHubSummaryData) {
-                    const statsCard = createGitHubStatsCard(gitHubSummaryData, completedItemsCategoryData);
-                    newsContainer.appendChild(statsCard);
-                    allNewsCards.push(statsCard);
-                    console.log('Created GitHub Stats card.');
-                }
+                // Optional: skip stats card in minimal “text grid” mode
 
                 convertedData.categories.forEach(category => {
                     if (category.topic === 'github_summary' || category.topic === 'completed_items') {
@@ -476,28 +590,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         category.content.forEach(item => {
                             if (item === gitHubSummaryData && gitHubSummaryData !== null) return; 
 
-                            const newsItemCard = createNewsCard(item, category.title);
-                            newsContainer.appendChild(newsItemCard);
-                            allNewsCards.push(newsItemCard);
+                            const newsTile = createNewsCard(item, category.title);
+                            newsContainer.appendChild(newsTile);
+                            allNewsCards.push(newsTile);
                         });
                     }
                 });
 
                 console.log(`Total cards created (including stats): ${allNewsCards.length}`);
-                if (allNewsCards.length > 0) {
-                    revisedShowSlide(0); 
-                    if (allNewsCards.length > 1) { 
-                       console.log(`Starting slide interval. Expected delay: ${SLIDE_INTERVAL + ANIMATION_DURATION}ms`);
-                       let intervalCount = 0;
-                       slideIntervalId = setInterval(() => {
-                           intervalCount++;
-                           console.log(`setInterval TICK #${intervalCount} - Calling nextSlide. isTransitioning: ${isTransitioning}`);
-                           nextSlide();
-                       }, SLIDE_INTERVAL + ANIMATION_DURATION);
-                    } else {
-                        console.log('Only one slide, not starting interval.');
-                    }
-                } else {
+                if (allNewsCards.length === 0) {
                     newsContainer.innerHTML = '<p>No news items to display.</p>';
                     console.log('No news items found after processing.');
                 }

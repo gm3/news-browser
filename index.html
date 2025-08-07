@@ -42,6 +42,7 @@
                         <button id="toggle-filters-btn" title="Toggle Filters">🔧</button>
                     </div>
                     <div class="action-buttons">
+                        <button id="toggle-layout-btn" title="Toggle layout">🧱</button>
                         <button id="load-news-btn" title="Load News">📥</button>
                         <button id="view-original-json-btn" title="View Original JSON">📄</button>
                         <button id="generate-json-btn" title="Generate Curated JSON">⚡</button>
@@ -95,7 +96,46 @@
             </div>
         </header>
         <main>
-            <div class="main-content">
+            <div class="newspaper-layout">
+                <!-- Left Column - Main + Development (stacked) -->
+                <div class="newspaper-column left-column">
+                    <div class="column-header">
+                        <h2>Main News</h2>
+                    </div>
+                    <div class="carousel-container horizontal-carousel">
+                        <div class="carousel-track" id="main-news-carousel"></div>
+                        <button class="carousel-nav prev" id="main-news-prev">‹</button>
+                        <button class="carousel-nav next" id="main-news-next">›</button>
+                    </div>
+
+                    <div class="column-header" style="margin-top: 12px;">
+                        <h2>Development</h2>
+                    </div>
+                    <div class="carousel-container horizontal-carousel">
+                        <div class="carousel-track" id="dev-news-carousel"></div>
+                        <button class="carousel-nav prev" id="dev-news-prev">‹</button>
+                        <button class="carousel-nav next" id="dev-news-next">›</button>
+                    </div>
+                </div>
+
+                <!-- Right Column - Community & Market -->
+                <div class="newspaper-column right-column">
+                    <div class="column-header">
+                        <h2>Community & Market</h2>
+                    </div>
+                    <div class="carousel-container vertical-carousel">
+                        <div class="carousel-track" id="community-news-carousel"></div>
+                        <button class="carousel-nav prev" id="community-news-prev">‹</button>
+                        <button class="carousel-nav next" id="community-news-next">›</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Masonry Layout (default visible) -->
+            <div id="masonry-layout" class="masonry-layout" style="display: none;"></div>
+
+            <!-- Original feed container (hidden by default) -->
+            <div class="main-content" style="display: none;">
                 <div id="loading-indicator" class="loading-indicator">
                     <div class="spinner"></div>
                     <p>Loading news...</p>
@@ -137,16 +177,22 @@
             </div>
         </main>
         <footer>
-            <div class="footer-content">
-                <span>© 2024 News Browser</span>
-                <span>•</span>
-                <a href="#" title="Privacy Policy">Privacy</a>
-                <span>•</span>
-                <a href="https://github.com/elizaOS/knowledge/blob/main/LICENSE" title="MIT License">MIT License</a>
-                <span>•</span>
-                <a href="https://github.com/elizaOS/news-browser" title="GitHub Repository">GitHub</a>
-                <span>•</span>
-                <a href="https://github.com/elizaOS/knowledge" title="Knowledge Repository">Knowledge</a>
+            <div class="footer-content large">
+                <div class="footer-links">
+                    <span>© 2024 News Browser</span>
+                    <span>•</span>
+                    <a href="#" title="Privacy Policy">Privacy</a>
+                    <span>•</span>
+                    <a href="https://github.com/elizaOS/knowledge/blob/main/LICENSE" title="MIT License">MIT License</a>
+                    <span>•</span>
+                    <a href="https://github.com/elizaOS/news-browser" title="GitHub Repository">GitHub</a>
+                    <span>•</span>
+                    <a href="https://github.com/elizaOS/knowledge" title="Knowledge Repository">Knowledge</a>
+                </div>
+                <audio id="footer-audio" controls preload="none" style="height:28px">
+                    <source src="assets/sample.mp3" type="audio/mpeg" />
+                    Your browser does not support the audio element.
+                </audio>
             </div>
         </footer>
         <div id="keyboard-shortcuts" class="keyboard-shortcuts">

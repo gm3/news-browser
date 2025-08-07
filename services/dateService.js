@@ -46,9 +46,16 @@ export async function fetchAvailableDates() {
  * Get the current date in YYYY-MM-DD format
  * @returns {string} Current date
  */
+// Return local YYYY-MM-DD with an optional day offset (default -1 to align with feed timing)
+const DAY_OFFSET = -1; // Adjust by -1 day as the feed lags by a day vs. local time
+
 export function getCurrentDate() {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
+    const now = new Date();
+    const adjusted = new Date(now.getFullYear(), now.getMonth(), now.getDate() + DAY_OFFSET);
+    const y = adjusted.getFullYear();
+    const m = String(adjusted.getMonth() + 1).padStart(2, '0');
+    const d = String(adjusted.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
 }
 
 /**
@@ -57,10 +64,12 @@ export function getCurrentDate() {
  * @returns {string} Formatted date string
  */
 export function formatDateForDisplay(dateString) {
-    const date = new Date(dateString);
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const year = date.getFullYear().toString().slice(-2); // Get last 2 digits of year
+    // Parse as YYYY-MM-DD in local time
+    const [y, m, d] = dateString.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    const month = (m).toString().padStart(2, '0');
+    const day = d.toString().padStart(2, '0');
+    const year = y.toString().slice(-2);
     return `${month}/${day}/${year}`;
 }
 

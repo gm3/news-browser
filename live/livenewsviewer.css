@@ -1,9 +1,10 @@
 body {
-    font-family: sans-serif;
+    font-family: Inter, system-ui, sans-serif;
     margin: 0;
-    background-color: #121212; /* Even darker background for full screen feel */
-    color: #e0e0e0;
-    overflow: hidden; 
+    background: radial-gradient(1200px 800px at 20% 10%, rgba(60,80,120,0.15), transparent),
+                radial-gradient(1200px 800px at 80% 90%, rgba(60,120,80,0.12), transparent),
+                #0b0e14;
+    color: #e6e9ef;
 }
 
 header {
@@ -27,44 +28,63 @@ header nav a:hover {
     text-decoration: underline;
 }
 
+/* Fluid, kinetic news wall */
 #live-news-container {
-    display: block; /* Simpler container, children will be positioned absolutely */
-    width: 100vw; 
-    height: 100vh; 
-    position: relative; 
-}
-
-.news-card { /* This is now a full-screen slide */
-    width: 100%;
-    height: 100%;
-    padding: 0; /* No padding on the slide itself */
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    grid-auto-rows: minmax(60px, auto);
+    gap: 10px;
+    width: 100vw;
+    min-height: 100vh;
+    padding: 12px;
     box-sizing: border-box;
-    display: flex; /* Two-column layout */
-    flex-direction: row;
-    align-items: stretch; /* Stretch panes to full height */
-
-    opacity: 0;
-    position: absolute;
-    top: 0;
-    left: 0;
-    visibility: hidden; 
-    transition: opacity 0.5s ease-out, visibility 0s linear 0.5s;
-    background-color: #121212; /* Slide background, same as body or slightly different if needed */
 }
 
-.news-card.active-slide {
-    opacity: 1;
-    visibility: visible;
-    z-index: 10; 
-    transition: opacity 0.5s ease-out, visibility 0s linear 0s;
+/* Card tiles */
+.news-card {
+    grid-column: span 3; /* default size */
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 10px 12px;
+    box-sizing: border-box;
+    backdrop-filter: blur(8px);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    will-change: transform;
 }
 
-.news-card.fade-in {
-    animation: fadeInAnimation 0.5s ease-out forwards;
+/* Random tile sizing for a kinetic grid */
+.news-card.size-1 { grid-column: span 2; }
+.news-card.size-2 { grid-column: span 3; }
+.news-card.size-3 { grid-column: span 4; }
+.news-card.tall    { grid-row: span 2; }
+
+.headline {
+    font-weight: 700;
+    line-height: 1.25;
+    margin: 0;
 }
 
-.news-card.fade-out {
-    animation: fadeOutAnimation 0.5s ease-out forwards;
+.snippet {
+    margin: 0;
+    color: #cbd5e1;
+}
+
+/* Scrolling text inside each card */
+.snippet-wrap {
+    overflow: hidden;
+}
+.snippet-text {
+    white-space: pre-wrap;
+    will-change: transform;
+}
+
+/* Subtle horizontal drift for cards */
+@keyframes driftX {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-20px); }
 }
 
 .media-pane {
@@ -161,34 +181,13 @@ header nav a:hover {
 }
 
 /* Responsive adjustments */
-@media (max-width: 768px) {
-    .news-card {
-        flex-direction: column; /* Stack panes vertically on small screens */
-    }
-
-    .media-pane,
-    .content-pane {
-        flex: 1 1 100%; /* Each pane takes full width */
-        max-height: 50vh; /* Limit height for each pane */
-    }
-
-    .media-pane {
-        padding: 10px;
-    }
-
-    .content-pane {
-        padding: 20px;
-        justify-content: flex-start; /* Align content to top */
-    }
-
-    .content-pane h2 {
-        font-size: 20px; /* Adjust fallback for smaller screens */
-        /* animation: horizontalTicker 10s linear infinite; /* Optionally adjust speed */
-    }
-
-    .content-pane p {
-        font-size: 12px; /* Adjust fallback for smaller screens */
-        line-height: 1.4;
-    }
-    /* .content-pane .source-links { ... } /* Ensure this is removed/commented if present */
-} 
+@media (max-width: 1200px) {
+    #live-news-container { grid-template-columns: repeat(8, 1fr); }
+}
+@media (max-width: 900px) {
+    #live-news-container { grid-template-columns: repeat(6, 1fr); }
+}
+@media (max-width: 600px) {
+    #live-news-container { grid-template-columns: repeat(4, 1fr); }
+    .news-card { grid-column: span 4; }
+}
