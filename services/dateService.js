@@ -58,12 +58,10 @@ export function getCurrentDate() {
  */
 export function formatDateForDisplay(dateString) {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const year = date.getFullYear().toString().slice(-2); // Get last 2 digits of year
+    return `${month}/${day}/${year}`;
 }
 
 /**

@@ -112,6 +112,60 @@ function initializeEventListeners() {
     
     // Keyboard shortcuts toggle
     safeAddEventListener('toggle-shortcuts', 'click', toggleShortcutsPanel);
+    
+    // Mobile menu controls
+    safeAddEventListener('hamburger-btn', 'click', toggleMobileMenu);
+    safeAddEventListener('mobile-close-btn', 'click', closeMobileMenu);
+    
+    // Mobile date navigation
+    safeAddEventListener('mobile-prev-date-btn', 'click', () => {
+        navigateToPreviousDate();
+        updateMobileDateDisplay();
+    });
+    safeAddEventListener('mobile-next-date-btn', 'click', () => {
+        navigateToNextDate();
+        updateMobileDateDisplay();
+    });
+    safeAddEventListener('mobile-today-btn', 'click', () => {
+        navigateToToday();
+        updateMobileDateDisplay();
+    });
+    safeAddEventListener('mobile-calendar-btn', 'click', () => {
+        closeMobileMenu();
+        showDateCalendar();
+    });
+    
+    safeAddEventListener('mobile-load-news-btn', 'click', () => {
+        closeMobileMenu();
+        showUrlPrompt(DEFAULT_URL, loadNewsFromUrl);
+    });
+    safeAddEventListener('mobile-view-json-btn', 'click', () => {
+        closeMobileMenu();
+        viewOriginalJson();
+    });
+    safeAddEventListener('mobile-generate-btn', 'click', () => {
+        closeMobileMenu();
+        generateCuratedJson();
+    });
+    safeAddEventListener('mobile-live-btn', 'click', () => {
+        closeMobileMenu();
+        openLiveNewsViewer();
+    });
+    safeAddEventListener('mobile-curation-btn', 'click', () => {
+        closeMobileMenu();
+        openPanel('curation');
+    });
+    safeAddEventListener('mobile-chatbot-btn', 'click', () => {
+        closeMobileMenu();
+        openPanel('chatbot');
+    });
+    safeAddEventListener('mobile-search-btn', 'click', performMobileSearch);
+    const mobileSearchInput = document.getElementById('mobile-search-input');
+    if (mobileSearchInput) {
+        mobileSearchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') performMobileSearch();
+        });
+    }
 }
 
 /**
@@ -667,15 +721,19 @@ async function initializeDateNavigation() {
  */
 function updateDateDisplay() {
     const displayElement = document.getElementById('current-date-display');
+    const mobileDisplayElement = document.getElementById('mobile-current-date-display');
+    
+    // Check if we're viewing daily.json (today's news)
+    const isViewingDaily = !currentDate || currentDate === getCurrentDate();
+    
+    const displayText = isViewingDaily ? 'Today' : formatDateForDisplay(currentDate);
+    
     if (displayElement) {
-        // Check if we're viewing daily.json (today's news)
-        const isViewingDaily = !currentDate || currentDate === getCurrentDate();
-        
-        if (isViewingDaily) {
-            displayElement.textContent = 'Today';
-        } else {
-            displayElement.textContent = formatDateForDisplay(currentDate);
-        }
+        displayElement.textContent = displayText;
+    }
+    
+    if (mobileDisplayElement) {
+        mobileDisplayElement.textContent = displayText;
     }
 }
 
@@ -887,4 +945,55 @@ function sendChatMessage() {
     
     // Scroll to bottom
     chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+/**
+ * Mobile menu functions
+ */
+function toggleMobileMenu() {
+    const mobileMenu = document.getElementById('mobile-menu');
+    if (mobileMenu.classList.contains('open')) {
+        closeMobileMenu();
+    } else {
+        openMobileMenu();
+    }
+}
+
+function openMobileMenu() {
+    const mobileMenu = document.getElementById('mobile-menu');
+    mobileMenu.classList.add('open');
+    document.body.style.overflow = 'hidden'; // Prevent background scrolling
+}
+
+function closeMobileMenu() {
+    const mobileMenu = document.getElementById('mobile-menu');
+    mobileMenu.classList.remove('open');
+    document.body.style.overflow = ''; // Restore scrolling
+}
+
+function performMobileSearch() {
+    const mobileSearchInput = document.getElementById('mobile-search-input');
+    const searchTerm = mobileSearchInput.value.trim();
+    
+    if (searchTerm) {
+        // Copy the search term to the main search input
+        const mainSearchInput = document.getElementById('search-input');
+        if (mainSearchInput) {
+            mainSearchInput.value = searchTerm;
+        }
+        
+        // Perform the search
+        performSearch();
+        
+        // Close mobile menu
+        closeMobileMenu();
+        
+        showToast(`Searching for: ${searchTerm}`);
+    }
+}
+
+function updateMobileDateDisplay() {
+    // This function is called after date navigation to ensure mobile display is updated
+    // The actual update is handled by updateDateDisplay() which now updates both desktop and mobile
+    updateDateDisplay();
 } 
